@@ -373,7 +373,3 @@ public class MyWidget : WidgetNode
     }
 }
 ```
-
-## Лицензия
-
-Copyright © 2026 AES
