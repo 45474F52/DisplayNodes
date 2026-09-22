@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AACC9E12-A41A-48DF-80BC-C4B528A46962}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>DisplayNodes.Kernel</RootNamespace>
+    <AssemblyName>Kernel</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\Kernel.xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\Kernel.xml</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="UnityClientKSGT">
+      <HintPath>..\..\SharedLibs\UnityClientKSGT.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Core\Alignment.cs" />
+    <Compile Include="Core\Color.cs" />
+    <Compile Include="Core\FixedNode.cs" />
+    <Compile Include="Core\GridDefinition.cs" />
+    <Compile Include="Core\GridNode.cs" />
+    <Compile Include="Core\LayoutNode.cs" />
+    <Compile Include="Core\MainAxisAlignment.cs" />
+    <Compile Include="Core\Observable.cs" />
+    <Compile Include="Core\OverlayNode.cs" />
+    <Compile Include="Core\Point.cs" />
+    <Compile Include="Core\Rect.cs" />
+    <Compile Include="Core\Rendering\IBrush.cs" />
+    <Compile Include="Core\Rendering\IBrushFactory.cs" />
+    <Compile Include="Core\Rendering\IEffectComponent.cs" />
+    <Compile Include="Core\Rendering\IFont.cs" />
+    <Compile Include="Core\Rendering\IFontFactory.cs" />
+    <Compile Include="Core\Rendering\IGraphicsPath.cs" />
+    <Compile Include="Core\Rendering\IImage.cs" />
+    <Compile Include="Core\Rendering\IImageComponent.cs" />
+    <Compile Include="Core\Rendering\IImageFactory.cs" />
+    <Compile Include="Core\Rendering\ILabelComponent.cs" />
+    <Compile Include="Core\Rendering\ILayoutComponent.cs" />
+    <Compile Include="Core\Rendering\ImageSizeMode.cs" />
+    <Compile Include="Core\Rendering\IMaskComponent.cs" />
+    <Compile Include="Core\Rendering\IRendererComponent.cs" />
+    <Compile Include="Core\Rendering\IRenderRoot.cs" />
+    <Compile Include="Core\Rendering\IRenderRootFactory.cs" />
+    <Compile Include="Core\Rendering\ITextFormat.cs" />
+    <Compile Include="Core\Rendering\ITextLayoutComponent.cs" />
+    <Compile Include="Core\Rendering\ITextMeasurer.cs" />
+    <Compile Include="Core\Rendering\IWidgetFactory.cs" />
+    <Compile Include="Core\Rendering\LabelStretch.cs" />
+    <Compile Include="Core\Rendering\TextDrawMethod.cs" />
+    <Compile Include="Core\Size.cs" />
+    <Compile Include="Core\StackLayoutNode.cs" />
+    <Compile Include="Core\Thickness.cs" />
+    <Compile Include="Core\UniformGridNode.cs" />
+    <Compile Include="Fluent\DisplayRoot.cs" />
+    <Compile Include="Fluent\ImageNodeFluent.cs" />
+    <Compile Include="Fluent\LabelNodeFluent.cs" />
+    <Compile Include="Fluent\LayoutNodeFluent.cs" />
+    <Compile Include="Fluent\ProcessBitmapNodeFluent.cs" />
+    <Compile Include="Fluent\UI.cs" />
+    <Compile Include="Fluent\WidgetNodeFluent.cs" />
+    <Compile Include="Helpers\LayoutNodeExtensions.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Widgets\BackgroundNode.cs" />
+    <Compile Include="Widgets\ClipNode.cs" />
+    <Compile Include="Widgets\ImageNode.cs" />
+    <Compile Include="Widgets\LabelNode.cs" />
+    <Compile Include="Widgets\WidgetNode.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{485E1267-1429-4CA0-8EBA-844D11376D58}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>DisplayNodes.Playground</RootNamespace>
+    <AssemblyName>Playground</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>DisplayNodes.Playground.Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="IDVM">
+      <HintPath>..\..\IDVM.dll</HintPath>
+    </Reference>
+    <Reference Include="System">
+      <HintPath>C:\Windows\Microsoft.NET\Framework64\v2.0.50727\System.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AppForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="AppForm.Designer.cs">
+      <DependentUpon>AppForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Compilation\BuiltInCompiler.cs" />
+    <Compile Include="Compilation\CompileResult.cs" />
+    <Compile Include="Compilation\ErrorParser.cs" />
+    <Compile Include="Compilation\ExternalCompilerLocator.cs" />
+    <Compile Include="Compilation\ExternalCscCompiler.cs" />
+    <Compile Include="Compilation\ICompiler.cs" />
+    <Compile Include="Compilation\ScriptInvoker.cs" />
+    <Compile Include="Compilation\ScriptRunner.cs" />
+    <Compile Include="Compilation\ScriptWrapper.cs" />
+    <Compile Include="Editor\BufferedPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.Comments.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.Completion.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.FindReplace.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.Gutter.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.Keys.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CodeEditor.Lines.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Editor\CompletionPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Editor\CSharpLexer.cs" />
+    <Compile Include="Editor\FindReplacePanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Editor\GoToLineDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Editor\SafeListBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Editor\ScrollRichTextBox.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Editor\SearchEngine.cs" />
+    <Compile Include="Editor\SyntaxHighlighter.cs" />
+    <Compile Include="Editor\UndoManager.cs" />
+    <Compile Include="Infrastructure\AppIndex.cs" />
+    <Compile Include="Infrastructure\AppLog.cs" />
+    <Compile Include="Infrastructure\AppSettings.cs" />
+    <Compile Include="Infrastructure\AppState.cs" />
+    <Compile Include="Infrastructure\AppViewModel.cs" />
+    <Compile Include="Infrastructure\DefaultScripts.cs" />
+    <Compile Include="Infrastructure\EditorSettings.cs" />
+    <Compile Include="Infrastructure\RecentFilesManager.cs" />
+    <Compile Include="Infrastructure\SettingsDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Infrastructure\StateKeys.cs" />
+    <Compile Include="Infrastructure\StringExtensions.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="AppForm.resx">
+      <DependentUpon>AppForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+    </Compile>
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="..\Gdi\Gdi.csproj">
+      <Project>{5a5e7ba5-c69d-4b22-ac2c-f31e38ff739e}</Project>
+      <Name>Gdi</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Kernel\Kernel.csproj">
+      <Project>{AACC9E12-A41A-48DF-80BC-C4B528A46962}</Project>
+      <Name>Kernel</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LibDisplayDrawingAdapter\LibDisplayDrawingAdapter.csproj">
+      <Project>{3d78f5d2-29d6-4af3-9d7e-505f8cd9ff1f}</Project>
+      <Name>LibDisplayDrawingAdapter</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

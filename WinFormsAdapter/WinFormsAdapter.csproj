@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A0E420FC-5D0C-4422-A73C-63FF871A5B42}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>DisplayNodes.WinFormsAdapter</RootNamespace>
+    <AssemblyName>WinFormsAdapter</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Debug\WinFormsAdapter.xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Adapter.cs" />
+    <Compile Include="Components\ComponentBase.cs" />
+    <Compile Include="Components\Image.cs" />
+    <Compile Include="Components\Label.cs" />
+    <Compile Include="Components\Layout.cs" />
+    <Compile Include="Components\Masks\CircleMask.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\Masks\EllipseMask.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\Masks\MaskBase.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\Masks\PathMask.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\Masks\RectMask.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Components\Masks\RoundedRectMask.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RenderRoot.cs" />
+    <Compile Include="RenderRootFactory.cs" />
+    <Compile Include="WidgetFactory.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Gdi\Gdi.csproj">
+      <Project>{5A5E7BA5-C69D-4B22-AC2C-F31E38FF739E}</Project>
+      <Name>Gdi</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Kernel\Kernel.csproj">
+      <Project>{AACC9E12-A41A-48DF-80BC-C4B528A46962}</Project>
+      <Name>Kernel</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
