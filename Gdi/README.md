@@ -421,7 +421,3 @@ public static class MyConversions
 
 - `DisplayNodes.Core` — абстрактные интерфейсы и типы
 - `System.Drawing` — GDI+ (только Windows)
-
-## Лицензия
-
-Copyright © 2026 AES
