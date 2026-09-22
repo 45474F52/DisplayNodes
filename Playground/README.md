@@ -276,7 +276,3 @@ private static void Main()
 - `LibDisplayDrawing` — легаси-библиотека рендеринга
 - `System.Windows.Forms` — UI приложения
 - `System.Drawing` — GDI+
-
-## Лицензия
-
-Copyright © 2026 AES
