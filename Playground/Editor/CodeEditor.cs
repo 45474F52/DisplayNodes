@@ -1,6 +1,25 @@
-﻿using System;
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 
 using DisplayNodes.Playground.Infrastructure;
@@ -22,19 +41,27 @@ namespace DisplayNodes.Playground.Editor
 		private bool _fastHighlightNext;
 		private int _completionPrefixLength;
 
-		static CodeEditor()
-		{
-			try
-			{
-				ApiIndex.Initialize(
-					typeof(DisplayNodes.Core.LayoutNode).Assembly,
-					typeof(LibDisplayDrawing.IComponent).Assembly,
-					typeof(System.Drawing.Color).Assembly);
-			}
-			catch (Exception ex) { AppLog.Error("CodeEditor.ApiIndexInit", ex); }
-		}
+        static CodeEditor()
+        {
+            try
+            {
+				Assembly[] assemblies = new Assembly[]
+                {
+                    typeof(DisplayNodes.Core.LayoutNode).Assembly,
+                    typeof(LibDisplayDrawing.IComponent).Assembly,
+                    typeof(System.Drawing.Color).Assembly,
+                    typeof(DisplayNodes.Gdi.GdiFont).Assembly
+                };
 
-		public CodeEditor(EditorSettings settings)
+                var docProvider = new XmlDocProvider();
+                docProvider.LoadFromAssemblies(assemblies);
+
+                ApiIndex.Initialize(docProvider, assemblies);
+            }
+            catch (Exception ex) { AppLog.Error("CodeEditor.ApiIndexInit", ex); }
+        }
+
+        public CodeEditor(EditorSettings settings)
 		{
 			if (settings == null)
 				throw new ArgumentNullException("settings");

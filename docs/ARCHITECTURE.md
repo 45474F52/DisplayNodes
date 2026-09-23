@@ -5,38 +5,38 @@
 ## Обзор модулей
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       DisplayNodes                              │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Kernel (ядро)                                           │   │
-│  │  ├── Core/            типы, LayoutNode, контейнеры       │   │
-│  │  ├── Core/Rendering/  интерфейсы бэкенда                 │   │
-│  │  ├── Widgets/         листовые узлы (Label, Image, ...)  │   │
-│  │  ├── Fluent/          UI-фабрика, DisplayRoot            │   │
-│  │  └── Helpers/         методы расширения                  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Gdi (GDI+-реализации)                                   │   │
-│  │  GdiFont, GdiBrush, GdiImage, GdiTextMeasurer, ...       │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Adapters (бэкенды рендеринга)                           │   │
-│  │  ├── WinFormsAdapter/                                    │   │
-│  │  └── ... (другие бэкенды)                                │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                  │
-│                              ▼                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Playground (IDE для скриптов)                           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                       DisplayNodes                       │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  Kernel (ядро)                                     │  │
+│  │  ├─ Core/            типы, LayoutNode, контейнеры  │  │
+│  │  ├─ Core/Rendering/  интерфейсы бэкенда            │  │
+│  │  ├─ Widgets/         листовые узлы (Label, Image…) │  │
+│  │  ├─ Fluent/          UI-фабрика, DisplayRoot       │  │
+│  │  └─ Helpers/         методы расширения             │  │
+│  └────────────────────────────────────────────────────┘  │
+│                              │                           │
+│                              ▼                           │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  Gdi (GDI+-реализации)                             │  │
+│  │  GdiFont, GdiBrush, GdiImage, GdiTextMeasurer, …   │  │
+│  └────────────────────────────────────────────────────┘  │
+│                              │                           │
+│                              ▼                           │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  Adapters (бэкенды рендеринга)                     │  │
+│  │  ├─ WinFormsAdapter/                               │  │
+│  │  └─ … (другие бэкенды)                             │  │
+│  └────────────────────────────────────────────────────┘  │
+│                              │                           │
+│                              ▼                           │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │  Playground (IDE для скриптов)                     │  │
+│  └────────────────────────────────────────────────────┘  │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ### Зависимости
@@ -60,6 +60,10 @@
 | `Thickness` | Отступы с четырёх сторон (Left, Top, Right, Bottom) |
 | `Color` | Цвет в формате RGBA |
 | `GridLength` | Размер строки/колонки в Grid (Pixel, Auto, Star) |
+| `Percent` | Процентное значение [0..100] с валидацией |
+| `GradientStop` | Точка градиента (Color + Percent Offset) |
+| `Shadow` | Описание тени (OffsetX, OffsetY, BlurRadius, Color) |
+| `Transform` | Описание аффинного преобразования (ScaleX, ScaleY, Rotation, SkewX, SkewY, Origin) |
 
 ### LayoutNode
 
@@ -73,14 +77,19 @@ public abstract class LayoutNode
     public Thickness Padding { get; set; }
     public Alignment HAlignment { get; set; }
     public Alignment VAlignment { get; set; }
+    public int? MinWidth { get; set; }
+    public int? MaxWidth { get; set; }
+    public int? MinHeight { get; set; }
+    public int? MaxHeight { get; set; }
+    public double FlexWeight { get; set; }
     public Size DesiredSize { get; protected set; }
     public Rect Bounds { get; protected set; }
     public List<LayoutNode> Children { get; }
-    
+
     // Публичный API
     public Size Measure(Size available);
     public virtual void Arrange(Rect finalRect);
-    
+
     // Переопределяется в наследниках
     protected abstract Size MeasureOverride(Size available);
     protected abstract void ArrangeOverride(Rect finalRect);
@@ -93,11 +102,15 @@ public abstract class LayoutNode
 
 | Контейнер | Поведение |
 |---|---|
-| `StackLayoutNode` | Строка или столбец. Дети располагаются последовательно вдоль главной оси |
+| `StackLayoutNode` | Строка или столбец. Дети располагаются последовательно вдоль главной оси. Поддерживает `FlexWeight` |
 | `GridNode` | Сетка с произвольными размерами строк/колонок (Pixel, Auto, Star) |
 | `UniformGridNode` | Равномерная сетка с фиксированным числом строк/колонок |
 | `OverlayNode` | Все дети в одном слоте (друг поверх друга) |
+| `WrapPanelNode` | Перенос детей на следующую строку/столбец при нехватке места |
+| `ConditionalNode` | Отображает одно из двух поддеревьев по `Observable<bool>` |
+| `TransformNode` | Применяет аффинное преобразование к единственному ребёнку |
 | `FixedNode` | Узел с фиксированным размером (распорка) |
+| `StretchNode` | Узел, растягивающийся вдоль обеих осей |
 
 **Общее правило для контейнеров:** контейнер всегда занимает весь предоставленный слот (с учётом `Margin`). Переопределение `Arrange` помечается как `sealed`:
 
@@ -110,6 +123,8 @@ public sealed override void Arrange(Rect finalRect)
 }
 ```
 
+Исключение — `LayoutNode` (базовый класс использует `virtual`) и виджеты (`FixedNode`/`StretchNode` — листовые, у них нет детей, но `Arrange` тоже может быть переопределён особым образом).
+
 ### Виджеты
 
 Виджеты — листовые узлы, оборачивающие компонент рендерера (`IRenderComponent`).
@@ -118,10 +133,10 @@ public sealed override void Arrange(Rect finalRect)
 public abstract class WidgetNode : LayoutNode, IDisposable
 {
     public IRenderComponent Component { get; }
-    
+
     protected override void ArrangeOverride(Rect finalRect) => ApplyBounds();
     protected abstract void ApplyBounds();
-    
+
     public IDisposable AddSubscription(IDisposable subscription);
     public void Dispose();
 }
@@ -151,8 +166,11 @@ Measure(available)
     ├── 2. Вызвать MeasureOverride(inner)
     │      (наследник вычисляет желаемый размер)
     │
-    └── 3. Прибавить Margin к результату
-           DesiredSize = MeasureOverride(inner) + Margin
+    ├── 3. Применить ограничения MinWidth/MaxWidth/MinHeight/MaxHeight
+    │      (см. раздел «Ограничения размеров»)
+    │
+    └── 4. Прибавить Margin к результату
+           DesiredSize = clamped + Margin
 ```
 
 **Контракт MeasureOverride:**
@@ -167,7 +185,7 @@ protected override Size MeasureOverride(Size available)
 {
     var inner = available.Deflate(Padding);
     int main = 0, cross = 0;
-    
+
     for (int i = 0; i < Children.Count; i++)
     {
         var s = Children[i].Measure(inner);
@@ -175,7 +193,7 @@ protected override Size MeasureOverride(Size available)
         cross = Math.Max(cross, s.Width);
         if (i > 0) main += Spacing;
     }
-    
+
     return new Size(cross + Padding.Horizontal, main + Padding.Vertical);
 }
 ```
@@ -218,30 +236,30 @@ protected override void ArrangeOverride(Rect finalRect)
 Метод `AlignRect` вычисляет прямоугольник внутри слота на основе `DesiredSize` и выравнивания:
 
 ```csharp
-private static Rect AlignRect(Size desired, Rect slot, 
+private static Rect AlignRect(Size desired, Rect slot,
                               Alignment horizontal, Alignment vertical)
 {
-    int w = horizontal == Alignment.Stretch 
-        ? slot.Size.Width 
+    int w = horizontal == Alignment.Stretch
+        ? slot.Size.Width
         : Math.Min(desired.Width, slot.Size.Width);
-    int h = vertical == Alignment.Stretch 
-        ? slot.Size.Height 
+    int h = vertical == Alignment.Stretch
+        ? slot.Size.Height
         : Math.Min(desired.Height, slot.Size.Height);
-    
+
     int x = horizontal switch
     {
         Alignment.Center => slot.Point.X + (slot.Size.Width - w) / 2,
         Alignment.End    => slot.Point.X + slot.Size.Width - w,
         _                => slot.Point.X
     };
-    
+
     int y = vertical switch
     {
         Alignment.Center => slot.Point.Y + (slot.Size.Height - h) / 2,
         Alignment.End    => slot.Point.Y + slot.Size.Height - h,
         _                => slot.Point.Y
     };
-    
+
     return new Rect(x, y, w, h);
 }
 ```
@@ -268,6 +286,114 @@ private static Rect AlignRect(Size desired, Rect slot,
 └──────────────────────────────────────────────────────────┘
 ```
 
+## Ограничения размеров (Min/Max)
+
+`LayoutNode` поддерживает четыре ограничения:
+
+- `MinWidth` (`int?`)
+- `MaxWidth` (`int?`)
+- `MinHeight` (`int?`)
+- `MaxHeight` (`int?`)
+
+Применяются в базовом методе `Measure` **после** вызова `MeasureOverride`, но **до** добавления `Margin`.
+
+```csharp
+public Size Measure(Size available)
+{
+    Size inner = new Size(
+        Math.Max(0, available.Width - Margin.Horizontal),
+        Math.Max(0, available.Height - Margin.Vertical)
+    );
+
+    Size measured = MeasureOverride(inner);
+
+    int w = measured.Width;
+    int h = measured.Height;
+
+    if (MinWidth.HasValue)  w = Math.Max(w, MinWidth.Value);
+    if (MaxWidth.HasValue)  w = Math.Min(w, MaxWidth.Value);
+    if (MinHeight.HasValue) h = Math.Max(h, MinHeight.Value);
+    if (MaxHeight.HasValue) h = Math.Min(h, MaxHeight.Value);
+
+    DesiredSize = new Size(w, h);
+    return new Size(DesiredSize.Width + Margin.Horizontal, DesiredSize.Height + Margin.Vertical);
+}
+```
+
+**Важно:**
+- Ограничения применяются к `DesiredSize` контента, не к слоту.
+- Если `MinWidth > MaxWidth` — ограничения не согласованы, побеждает `MaxWidth`.
+- `Margin` прибавляется **после** ограничений — то есть `MaxWidth` ограничивает контент, а не полный размер с margin.
+- Наследники (`MeasureOverride`) не знают об ограничениях — это ответственность базового класса.
+
+**Пример:**
+
+```csharp
+UI.Label("Text", font, brush)
+    .MinWidth(100)
+    .MaxWidth(400)
+    .MinHeight(30)
+    .MaxHeight(200);
+```
+
+## Flex-механика в StackLayoutNode
+
+`StackLayoutNode` поддерживает пропорциональное распределение свободного пространства через `LayoutNode.FlexWeight` (`double`, default `0`).
+
+- `FlexWeight == 0` — узел фиксированного размера (не участвует в распределении).
+- `FlexWeight > 0` — узел получает долю свободного места пропорционально весу.
+
+### Алгоритм Measure
+
+1. **Первый проход** — измеряются все дети с `available`. Flex-дети получают свой «естественный» размер (`DesiredSize`).
+2. **Вычисление свободного места:**
+   ```
+   totalNatural = sum(DesiredSize всех детей по главной оси) + Spacing
+   free = availableMain - totalNatural
+   ```
+3. **Распределение:**
+   - Если `free > 0` — flex-дети растягиваются: `cm = natural + free * (weight / totalWeight)`.
+   - Если `free < 0` — flex-дети сжимаются: `cm = max(0, natural - |free| * (weight / totalWeight))`. Fixed-дети не сжимаются.
+   - Если `free == 0` — размеры не меняются.
+
+### Алгоритм Arrange
+
+Та же логика распределения, что в Measure. Размеры детей вдоль главной оси берутся из `DesiredSize` (для fixed) и пересчитываются (для flex). `MainAxisAlignment` применяется к `actualFree` **после** распределения flex.
+
+### Пример
+
+```csharp
+UI.Column(spacing: 8)
+    .Add(UI.Label("Fixed", font, brush))            // FlexWeight = 0
+    .Add(UI.Label("Stretched", font, brush).Flex(1)) // забирает всё свободное место
+    .Add(UI.Label("Double", font, brush).Flex(2));   // забирает 2 доли из 3
+```
+
+### StretchNode
+
+`StretchNode` — публичный узел, растягивающийся вдоль обеих осей. Полезен как flex-ребёнок, когда нужно, чтобы ребёнок растянулся:
+
+```csharp
+public sealed class StretchNode : LayoutNode
+{
+    public int NaturalWidth { get; }
+    public int NaturalHeight { get; }
+
+    public StretchNode(int naturalWidth = 0, int naturalHeight = 0)
+    {
+        NaturalWidth = naturalWidth;
+        NaturalHeight = naturalHeight;
+        HAlignment = Alignment.Stretch;
+        VAlignment = Alignment.Stretch;
+    }
+
+    protected override Size MeasureOverride(Size available) => new Size(NaturalWidth, NaturalHeight);
+    protected override void ArrangeOverride(Rect finalRect) { }
+}
+```
+
+`StretchNode` при Measure возвращает natural размер, при Arrange растягивается до слота через `HAlignment/VAlignment = Stretch`.
+
 ## Жизненный цикл компонента
 
 Компонент рендерера (`IRenderComponent`) — это обёртка над нативным контролом бэкенда.
@@ -286,7 +412,7 @@ label.ForegroundBrush = brush;
 // 3. Компонент привязывается к родителю
 label.Parent = parentComponent;  // автоматически добавляется в Controls родителя
 
-// 4. Устанавливаются геометрия
+// 4. Устанавливается геометрия
 label.Location = new Point(10, 20);
 label.Size = new Size(100, 50);
 ```
@@ -325,18 +451,18 @@ root.Dispose();
 **Реализация Apply:**
 
 ```csharp
-public static void Apply(this LayoutNode root, IRenderComponent parent, 
+public static void Apply(this LayoutNode root, IRenderComponent parent,
                          Point location, Size size)
 {
     _ = root.Measure(size);
     root.Arrange(new Rect(location, size));
-    
+
     var components = new List<IRenderComponent>();
     ApplyRecursive(root, parent, components);
     root.AppliedComponents = components;
 }
 
-private static void ApplyRecursive(LayoutNode root, IRenderComponent parent, 
+private static void ApplyRecursive(LayoutNode root, IRenderComponent parent,
                                    ICollection<IRenderComponent> components)
 {
     if (root is WidgetNode widget)
@@ -345,7 +471,7 @@ private static void ApplyRecursive(LayoutNode root, IRenderComponent parent,
         components.Add(widget.Component);
         return;
     }
-    
+
     if (root is ClipNode clip)
     {
         clip.Mask.Parent = parent;
@@ -354,17 +480,25 @@ private static void ApplyRecursive(LayoutNode root, IRenderComponent parent,
             ApplyRecursive(child, clip.Mask, components);
         return;
     }
-    
+
+    if (root is TransformNode)
+    {
+        throw new NotSupportedException(
+            "TransformNode is not supported by current adapters yet.");
+    }
+
     foreach (LayoutNode child in root.Children)
         ApplyRecursive(child, parent, components);
 }
 ```
 
+**Примечание:** `TransformNode` бросает `NotSupportedException` в `ApplyRecursive`, потому что текущие адаптеры не поддерживают трансформации. Layout для `TransformNode` работает корректно — исключение возникает только при попытке рендеринга.
+
 ## Реактивность (Observable)
 
-`Observable<T>` — реактивное свойство с подпиской на изменения.
+### Observable<T>
 
-### Устройство
+`Observable<T>` — реактивное свойство с подпиской на изменения.
 
 ```csharp
 public class Observable<T>
@@ -372,7 +506,7 @@ public class Observable<T>
     private readonly object _lock = new object();
     private readonly List<Action<T>> _subscribers = new List<Action<T>>();
     private T _value;
-    
+
     public T Value
     {
         get { lock (_lock) return _value; }
@@ -393,31 +527,103 @@ public class Observable<T>
             }
         }
     }
-    
+
     public IDisposable Subscribe(Action<T> callback);
     internal void Unsubscribe(Action<T> callback);
 }
 ```
 
-### Потокобезопасность
-
+**Потокобезопасность:**
 - `Value` getter/setter защищены `lock`.
 - Подписки/отписки защищены `lock`.
 - Уведомления происходят **вне** `lock`, чтобы избежать deadlock.
-- Исключения в подписчиках не прерывают цепочку.
+- Исключения в подписчиках перехватываются и игнорируются.
 
-### Привязка к виджетам
+### IObservableSource
+
+`IObservableSource` — не-generic интерфейс для подписки на `Observable<T>` с разными `T`. Используется в `ComputedObservable<T>`.
 
 ```csharp
-public LabelNode BindText(Observable<string> observable)
+public interface IObservableSource
 {
-    Component.Text = observable.Value ?? string.Empty;
-    _ = AddSubscription(observable.Subscribe(v => Component.Text = v ?? string.Empty));
-    return this;
+    IDisposable Subscribe(Action<object> callback);
 }
 ```
 
-**Важно:** подписка автоматически отписывается при `Dispose` виджета через `AddSubscription`.
+`Observable<T>` реализует `IObservableSource` явно:
+
+```csharp
+IDisposable IObservableSource.Subscribe(Action<object> callback)
+{
+    return Subscribe(v => callback(v));
+}
+```
+
+**Boxing:** для value-type это упаковка при уведомлении. Для ссылочных типов — без оверхеда.
+
+**Зачем нужен:** из-за инвариантности generic'ов в C# нельзя передать `Observable<int>`, `Observable<string>` и `Observable<bool>` в один `params Observable<object>[]`. Через `IObservableSource` это возможно.
+
+### ComputedObservable<T>
+
+`ComputedObservable<T>` — реактивное свойство, значение которого вычисляется из других источников.
+
+```csharp
+public class ComputedObservable<T> : Observable<T>, IDisposable
+{
+    public ComputedObservable(Func<T> compute, params IObservableSource[] dependencies);
+
+    public void Refresh();  // ручной пересчёт
+
+    public void Dispose();  // отписка от всех зависимостей
+}
+```
+
+**Поведение:**
+1. При создании значение вычисляется один раз (`ComputeInitial`).
+2. При изменении любой зависимости вызывается `compute()`.
+3. Если новое значение отличается от текущего — уведомляются подписчики.
+4. При `Dispose` отписывается от всех зависимостей.
+
+**Порядок вызовов:**
+```
+a.Value = 1  → computed.OnDependencyChanged → compute() → Value = ...
+b.Value = 2  → computed.OnDependencyChanged → compute() → Value = ...
+```
+
+Оба пересчёта корректны, но второй — избыточен (см. ROADMAP → «Batch-обновления ComputedObservable»).
+
+### ObservableList<T>
+
+`ObservableList<T>` — реактивная коллекция, реализующая `IList<T>`.
+
+```csharp
+public class ObservableList<T> : IList<T>, IDisposable
+{
+    public event Action<ListChange<T>> Changed;
+
+    // IList<T>
+    public void Add(T item);
+    public void Insert(int index, T item);
+    public bool Remove(T item);
+    public void RemoveAt(int index);
+    public void Clear();
+    public void Move(int oldIndex, int newIndex);  // расширение
+
+    // ...
+}
+```
+
+**Типы изменений (`ListChangeType`):** `Add`, `Insert`, `Remove`, `Replace`, `Move`, `Reset`.
+
+**Описание изменения (`ListChange<T>`):** `Type`, `OldIndex`, `NewIndex`, `Item`.
+
+**Особенности:**
+- Потокобезопасна (внутренний `lock`).
+- Событие `Changed` вызывается **вне lock'а**.
+- Все подписчики вызываются отдельно через `GetInvocationList()` — исключение в одном не ломает цепочку.
+- `GetEnumerator` возвращает enumerator `List<T>` (`foreach` бросает `InvalidOperationException` при модификации, как в `List<T>`).
+- `ToList()` — безопасный снимок.
+- `Dispose` делает коллекцию непригодной: любая операция бросает `ObjectDisposedException`.
 
 ### Подписка и отписка
 
@@ -425,12 +631,87 @@ public LabelNode BindText(Observable<string> observable)
 // Ручная подписка (требует явной отписки)
 var subscription = observable.Subscribe(v => Console.WriteLine(v));
 // ...
-subscription.Dispose();  // отписка
+subscription.Dispose();
 
 // Автоматическая отписка через виджет
 var label = UI.Label("text", font, brush).BindText(observable);
 // при label.Dispose() подписка автоматически отписывается
 ```
+
+## Визуальные эффекты (API)
+
+Три визуальных эффекта описаны в API ядра, но **не поддерживаются** текущими адаптерами. При попытке использования они бросают `NotSupportedException`.
+
+### Градиенты
+
+```csharp
+public interface IBrushFactory
+{
+    IBrush CreateSolidBrush(Color color);
+
+    IBrush CreateLinearGradient(Point start, Point end, params GradientStop[] stops);
+    IBrush CreateRadialGradient(Point center, Percent radius, params GradientStop[] stops);
+}
+```
+
+Координаты градиента — нормализованные (0..100). Стопы — `GradientStop(Color, Percent)`.
+
+**GDI-описания:**
+- `GdiLinearGradientBrush` — описание линейного градиента (Start, End, Stops).
+- `GdiRadialGradientBrush` — описание радиального градиента (Center, Radius, Stops).
+
+Конкретная GDI+ кисть создаётся в момент отрисовки через `CreateGdiBrush(RectangleF)`, потому что GDI+ не поддерживает относительные координаты.
+
+**Ограничение:** `GdiConversions.ToGdi(IBrush)` бросает `NotSupportedException` для градиентных кистей — адаптеры их не поддерживают.
+
+### Shadow
+
+```csharp
+public readonly struct Shadow
+{
+    public readonly int OffsetX;
+    public readonly int OffsetY;
+    public readonly int BlurRadius;
+    public readonly Color Color;
+}
+
+public interface IEffectComponent
+{
+    double Opacity { get; set; }
+    double Brightness { get; set; }
+    double Contrast { get; set; }
+    Shadow? Shadow { get; set; }  // ← новое
+}
+```
+
+**Ограничение:** адаптеры бросают `NotSupportedException` при попытке установить не-null `Shadow`.
+
+### TransformNode
+
+```csharp
+public readonly struct Transform
+{
+    public readonly float ScaleX;
+    public readonly float ScaleY;
+    public readonly float Rotation;  // градусы
+    public readonly float SkewX;
+    public readonly float SkewY;
+    public readonly Point Origin;     // нормализованный (0..100)
+}
+
+public class TransformNode : LayoutNode
+{
+    public Transform Transform { get; set; }
+    public LayoutNode Child { get; set; }
+
+    protected override Size MeasureOverride(Size available);
+    protected override void ArrangeOverride(Rect finalRect);
+}
+```
+
+`TransformNode` **учитывается в layout**: `Measure` возвращает bounding box трансформированного ребёнка. Порядок трансформации — scale → skew → rotate, относительно `Origin`.
+
+**Ограничение:** `ApplyRecursive` бросает `NotSupportedException` при обнаружении `TransformNode` — адаптеры не поддерживают трансформации.
 
 ## Бэкенд-агностичность
 
@@ -457,6 +738,8 @@ public interface IFontFactory
 public interface IBrushFactory
 {
     IBrush CreateSolidBrush(Color color);
+    IBrush CreateLinearGradient(Point start, Point end, params GradientStop[] stops);
+    IBrush CreateRadialGradient(Point center, Percent radius, params GradientStop[] stops);
 }
 
 public interface IImageFactory
@@ -510,6 +793,7 @@ public interface IEffectComponent
     double Opacity { get; set; }
     double Brightness { get; set; }
     double Contrast { get; set; }
+    Shadow? Shadow { get; set; }
 }
 ```
 
@@ -655,8 +939,13 @@ counter.Subscribe(v =>
 {
     // Этот код выполнится в потоке, который вызвал counter.Value = 10
     // Если это фоновый поток, нужно использовать Dispatcher.Invoke
+    // для обновления UI
 });
 ```
+
+### ObservableList
+
+`ObservableList<T>` потокобезопасен — все операции защищены `lock`. Событие `Changed` вызывается вне lock'а, что позволяет подписчику безопасно изменять коллекцию.
 
 ### GdiTextMeasurer
 
@@ -675,7 +964,7 @@ counter.Subscribe(v =>
 
 | Кто создал | Кто владеет | Кто диспоузит |
 |---|---|---|
-| Фабрика (`UI.Font`, `UI.Brush`) | Consumer-код | Consumer-код |
+| Фабрика (`UI.Font`, `UI.SolidBrush`) | Consumer-код | Consumer-код |
 | Адаптер (клон при установке) | Адаптер | Адаптер при `Dispose` |
 | `Observable<T>` | Consumer-код | Consumer-код |
 | Подписка (`Subscribe`) | Consumer-код | Consumer-код или виджет при `Dispose` |
@@ -762,13 +1051,13 @@ public class MyContainer : LayoutNode
         Bounds = inner;
         ArrangeOverride(inner);
     }
-    
+
     protected override Size MeasureOverride(Size available)
     {
         // Вычислить DesiredSize на основе детей
         return new Size(width, height);
     }
-    
+
     protected override void ArrangeOverride(Rect finalRect)
     {
         // Разместить детей через child.Arrange(rect)
@@ -782,12 +1071,12 @@ public class MyContainer : LayoutNode
 public class MyWidget : WidgetNode
 {
     public MyWidget(IRenderComponent component) : base(component) { }
-    
+
     protected override Size MeasureOverride(Size available)
     {
         return new Size(100, 50);
     }
-    
+
     protected override void ApplyBounds()
     {
         Component.Location = Bounds.Point;
@@ -798,8 +1087,11 @@ public class MyWidget : WidgetNode
 
 ### Создание своего бэкенда
 
-См. `CUSTOM_ADAPTERS_GUIDELINE.md` для подробного руководства.
+См. [Гайдлайн по созданию адаптеров](CUSTOM_ADAPTERS_GUIDELINE.md) для подробного руководства.
 
 ## Заключение
 
-DisplayNodes — декларативная система компоновки UI с бэкенд-агностичной архитектурой. Ядро реализует двухпроходный алгоритм Measure/Arrange, реактивные свойства через `Observable<T>`, и абстрактные интерфейсы для ресурсов. Конкретные бэкенды (адаптеры) реализуют эти интерфейсы, клонируют ресурсы при установке и управляют жизненным циклом компонентов.
+DisplayNodes — декларативная система компоновки UI с бэкенд-агностичной архитектурой.
+Ядро реализует двухпроходный алгоритм Measure/Arrange, реактивные свойства через `Observable<T>`,
+и абстрактные интерфейсы для ресурсов. Конкретные бэкенды (адаптеры) реализуют эти интерфейсы,
+клонируют ресурсы при установке и управляют жизненным циклом компонентов.

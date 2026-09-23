@@ -1,213 +1,337 @@
-﻿using System;
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 
+using DisplayNodes.Playground.Editor;
+
 namespace DisplayNodes.Playground.Infrastructure
 {
-	/// <summary>
-	/// Реестр типов и их публичных членов, собранный из рефлексии.
-	/// Потокобезопасный: все публичные методы защищены lock'ом.
-	/// </summary>
-	internal static class ApiIndex
-	{
-		private static readonly object _lock = new object();
+    /// <summary>
+    /// Реестр типов и их публичных членов, собранный из рефлексии.
+    /// Потокобезопасный: все публичные методы защищены lock'ом.
+    /// </summary>
+    internal static class ApiIndex
+    {
+        private static readonly object _lock = new object();
 
-		// Имя типа → список имён членов.
-		private static readonly Dictionary<string, List<string>> _byType =
-			new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        // Имя типа → список членов (методы, свойства, поля).
+        private static readonly Dictionary<string, List<CompletionItem>> _byType =
+            new Dictionary<string, List<CompletionItem>>(StringComparer.Ordinal);
 
-		// Все типы по имени, чтобы быстро находить нужный.
-		private static readonly Dictionary<string, Type> _types =
-			new Dictionary<string, Type>(StringComparer.Ordinal);
+        // Все типы по имени.
+        private static readonly Dictionary<string, Type> _types =
+            new Dictionary<string, Type>(StringComparer.Ordinal);
 
-		private static readonly HashSet<string> _namespaces =
-			new HashSet<string>(StringComparer.Ordinal);
+        private static readonly HashSet<string> _namespaces =
+            new HashSet<string>(StringComparer.Ordinal);
 
-		public static bool IsInitialized { get; private set; }
+        private static XmlDocProvider _docProvider;
 
-		public static void Initialize(params Assembly[] assemblies)
-		{
-			lock (_lock)
-			{
-				if (IsInitialized)
-					return;
+        public static bool IsInitialized { get; private set; }
 
-				IsInitialized = true;
+        public static void Initialize(XmlDocProvider docProvider, params Assembly[] assemblies)
+        {
+            lock (_lock)
+            {
+                if (IsInitialized)
+                    return;
 
-				foreach (var asm in assemblies)
-				{
-					if (asm == null)
-						continue;
+                IsInitialized = true;
+                _docProvider = docProvider;
 
-					Type[] types;
+                foreach (var asm in assemblies)
+                {
+                    if (asm == null)
+                        continue;
 
-					try
-					{
-						types = asm.GetTypes();
-					}
-					catch (ReflectionTypeLoadException ex)
-					{
-						types = ex.Types;
-					}
-					foreach (Type t in types)
-					{
-						if (t == null)
-							continue;
+                    Type[] types;
+                    try
+                    {
+                        types = asm.GetTypes();
+                    }
+                    catch (ReflectionTypeLoadException ex)
+                    {
+                        types = ex.Types;
+                    }
 
-						if (!t.IsPublic && !t.IsNestedPublic)
-							continue;
+                    foreach (Type t in types)
+                    {
+                        if (t == null)
+                            continue;
+                        if (!t.IsPublic && !t.IsNestedPublic)
+                            continue;
+                        if (t.IsGenericTypeDefinition)
+                            continue;
 
-						if (t.IsGenericTypeDefinition)
-							continue;
+                        RegisterTypeInternal(t);
+                    }
+                }
+            }
+        }
 
-						RegisterTypeInternal(t);
-					}
-				}
-			}
-		}
+        public static void RegisterType(Type t)
+        {
+            if (t == null)
+                return;
 
-		/// <summary>
-		/// Зарегистрировать один тип (например, String/Int32 из mscorlib
-		/// по требованию). Полезно, чтобы не сканировать всю mscorlib.
-		/// </summary>
-		public static void RegisterType(Type t)
-		{
-			if (t == null)
-				return;
+            lock (_lock)
+            {
+                if (_byType.ContainsKey(t.Name))
+                    return;
+                RegisterTypeInternal(t);
+            }
+        }
 
-			lock (_lock)
-			{
-				if (_byType.ContainsKey(t.Name))
-					return;
+        private static void RegisterTypeInternal(Type t)
+        {
+            _types[t.Name] = t;
 
-				RegisterTypeInternal(t);
-			}
-		}
+            if (!string.IsNullOrEmpty(t.Namespace))
+            {
+                string ns = t.Namespace;
+                _namespaces.Add(ns);
+                int idx = 0;
+                while (true)
+                {
+                    idx = ns.IndexOf('.', idx);
+                    if (idx < 0)
+                        break;
+                    _namespaces.Add(ns.Substring(0, idx));
+                    idx++;
+                }
+            }
 
-		private static void RegisterTypeInternal(Type t)
-		{
-			// Вызывается только под lock'ом.
-			_types[t.Name] = t;
+            var members = new List<CompletionItem>();
 
-			// Собираем namespace-ы: для типа System.Drawing.Color
-			// добавляем System, System.Drawing.
-			if (!string.IsNullOrEmpty(t.Namespace))
-			{
-				string ns = t.Namespace;
-				_namespaces.Add(ns);
-				// Все префиксы: A.B.C → A, A.B, A.B.C
-				int idx = 0;
-				while (true)
-				{
-					idx = ns.IndexOf('.', idx);
-					if (idx < 0)
-						break;
-					_namespaces.Add(ns.Substring(0, idx));
-					idx++;
-				}
-			}
+            MethodInfo[] methods = t.GetMethods(BindingFlags.Public
+                | BindingFlags.Static | BindingFlags.Instance
+                | BindingFlags.DeclaredOnly);
+            foreach (var m in methods)
+            {
+                if (m.IsSpecialName)
+                    continue;
+                if (ContainsName(members, m.Name))
+                    continue;
+                members.Add(BuildMethodItem(m));
+            }
 
-			// Члены типа.
-			var members = new List<string>();
-			MethodInfo[] methods = t.GetMethods(BindingFlags.Public
-				| BindingFlags.Static | BindingFlags.Instance
-				| BindingFlags.DeclaredOnly);
-			foreach (var m in methods)
-			{
-				if (m.IsSpecialName)
-					continue;
-				if (!members.Contains(m.Name))
-					members.Add(m.Name);
-			}
+            PropertyInfo[] props = t.GetProperties(BindingFlags.Public
+                | BindingFlags.Static | BindingFlags.Instance
+                | BindingFlags.DeclaredOnly);
+            foreach (var p in props)
+            {
+                if (ContainsName(members, p.Name))
+                    continue;
+                members.Add(BuildPropertyItem(p));
+            }
 
-			PropertyInfo[] props = t.GetProperties(BindingFlags.Public
-				| BindingFlags.Static | BindingFlags.Instance
-				| BindingFlags.DeclaredOnly);
-			foreach (var p in props)
-			{
-				if (!members.Contains(p.Name))
-					members.Add(p.Name);
-			}
+            FieldInfo[] fields = t.GetFields(BindingFlags.Public
+                | BindingFlags.Static | BindingFlags.Instance
+                | BindingFlags.DeclaredOnly);
+            foreach (var f in fields)
+            {
+                if (ContainsName(members, f.Name))
+                    continue;
+                members.Add(BuildFieldItem(f));
+            }
 
-			members.Sort(StringComparer.Ordinal);
-			_byType[t.Name] = members;
-		}
+            members.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+            _byType[t.Name] = members;
+        }
 
-		/// <summary>
-		/// Возвращает методы и свойства типа по имени, или null если тип неизвестен.
-		/// Возвращает копию списка — безопасна для использования вне lock'а.
-		/// </summary>
-		public static List<string> GetMembers(string typeName)
-		{
-			if (string.IsNullOrEmpty(typeName))
-				return null;
+        private static bool ContainsName(List<CompletionItem> list, string name)
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (list[i].Name == name)
+                    return true;
+            return false;
+        }
 
-			lock (_lock)
-			{
-				if (_byType.TryGetValue(typeName, out List<string> members))
-					return new List<string>(members);
+        private static CompletionItem BuildMethodItem(MethodInfo m)
+        {
+            string signature = BuildMethodSignature(m);
+            string doc = _docProvider?.GetSummary(m);
 
-				Type t = Type.GetType(typeName);
-				if (t != null)
-				{
-					RegisterTypeInternal(t);
-					if (_byType.TryGetValue(typeName, out members))
-						return new List<string>(members);
-				}
-				return null;
-			}
-		}
+            return new CompletionItem
+            {
+                Name = m.Name,
+                Kind = CompletionItemKind.Method,
+                Signature = signature,
+                ReturnType = FriendlyTypeName(m.ReturnType),
+                Documentation = doc
+            };
+        }
 
-		/// <summary>Известен ли такой тип.</summary>
-		public static bool KnowsType(string typeName)
-		{
-			if (string.IsNullOrEmpty(typeName))
-				return false;
+        private static CompletionItem BuildPropertyItem(PropertyInfo p)
+        {
+            string typeName = FriendlyTypeName(p.PropertyType);
 
-			lock (_lock)
-			{
-				return _types.ContainsKey(typeName);
-			}
-		}
+            return new CompletionItem
+            {
+                Name = p.Name,
+                Kind = CompletionItemKind.Property,
+                Signature = typeName + " " + p.Name + " { get; }",
+                ReturnType = typeName,
+                Documentation = _docProvider?.GetSummary(p)
+            };
+        }
 
-		/// <summary>
-		/// Знает ли ApiIndex такой идентификатор как тип ИЛИ namespace.
-		/// Используется лексером для подсветки квалифицированных имён.
-		/// </summary>
-		public static bool KnowsTypeOrNamespace(string name)
-		{
-			if (string.IsNullOrEmpty(name))
-				return false;
+        private static CompletionItem BuildFieldItem(FieldInfo f)
+        {
+            string typeName = FriendlyTypeName(f.FieldType);
 
-			lock (_lock)
-			{
-				return _types.ContainsKey(name) || _namespaces.Contains(name);
-			}
-		}
+            return new CompletionItem
+            {
+                Name = f.Name,
+                Kind = CompletionItemKind.Field,
+                Signature = typeName + " " + f.Name,
+                ReturnType = typeName,
+                Documentation = _docProvider?.GetSummary(f)
+            };
+        }
 
-		public static Type FindType(string name)
-		{
-			if (string.IsNullOrEmpty(name))
-				return null;
+        private static string BuildMethodSignature(MethodInfo m)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append(FriendlyTypeName(m.ReturnType));
+            sb.Append(' ');
+            sb.Append(m.Name);
+            sb.Append('(');
 
-			lock (_lock)
-			{
-				return _types.TryGetValue(name, out Type t) ? t : null;
-			}
-		}
+            ParameterInfo[] ps = m.GetParameters();
+            for (int i = 0; i < ps.Length; i++)
+            {
+                if (i > 0)
+                    sb.Append(", ");
+                sb.Append(FriendlyTypeName(ps[i].ParameterType));
+                sb.Append(' ');
+                sb.Append(ps[i].Name);
+            }
 
-        /// <summary>
-        /// Является ли указанный тип интерфейсом.
-        /// </summary>
+            sb.Append(')');
+            return sb.ToString();
+        }
+
+        private static string FriendlyTypeName(Type t)
+        {
+            if (t == null)
+                return "?";
+
+            // Примитивы — по ключевым словам C#.
+            if (t == typeof(void)) return "void";
+            if (t == typeof(int)) return "int";
+            if (t == typeof(long)) return "long";
+            if (t == typeof(short)) return "short";
+            if (t == typeof(byte)) return "byte";
+            if (t == typeof(sbyte)) return "sbyte";
+            if (t == typeof(uint)) return "uint";
+            if (t == typeof(ulong)) return "ulong";
+            if (t == typeof(ushort)) return "ushort";
+            if (t == typeof(bool)) return "bool";
+            if (t == typeof(string)) return "string";
+            if (t == typeof(object)) return "object";
+            if (t == typeof(double)) return "double";
+            if (t == typeof(float)) return "float";
+            if (t == typeof(decimal)) return "decimal";
+            if (t == typeof(char)) return "char";
+
+            // Generic — рекурсивно.
+            if (t.IsGenericType)
+            {
+                string baseName = t.Name;
+                int tick = baseName.IndexOf('`');
+                if (tick >= 0)
+                    baseName = baseName.Substring(0, tick);
+
+                var args = t.GetGenericArguments();
+                var sb = new System.Text.StringBuilder();
+                sb.Append(baseName);
+                sb.Append('<');
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (i > 0)
+                        sb.Append(", ");
+                    sb.Append(FriendlyTypeName(args[i]));
+                }
+                sb.Append('>');
+                return sb.ToString();
+            }
+
+            if (t.IsArray)
+                return FriendlyTypeName(t.GetElementType()) + "[]";
+
+            return t.Name;
+        }
+
+        public static List<CompletionItem> GetMembers(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+                return null;
+
+            lock (_lock)
+            {
+                if (_byType.TryGetValue(typeName, out List<CompletionItem> members))
+                    return new List<CompletionItem>(members);
+
+                Type t = Type.GetType(typeName);
+                if (t != null)
+                {
+                    RegisterTypeInternal(t);
+                    if (_byType.TryGetValue(typeName, out members))
+                        return new List<CompletionItem>(members);
+                }
+                return null;
+            }
+        }
+
+        public static bool KnowsType(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+                return false;
+            lock (_lock)
+                return _types.ContainsKey(typeName);
+        }
+
+        public static bool KnowsTypeOrNamespace(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+            lock (_lock)
+                return _types.ContainsKey(name) || _namespaces.Contains(name);
+        }
+
+        public static Type FindType(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return null;
+            lock (_lock)
+                return _types.TryGetValue(name, out Type t) ? t : null;
+        }
+
         public static bool IsInterface(string typeName)
         {
             if (string.IsNullOrEmpty(typeName))
                 return false;
-
             lock (_lock)
-            {
                 return _types.TryGetValue(typeName, out Type t) && t.IsInterface;
-            }
         }
     }
 }

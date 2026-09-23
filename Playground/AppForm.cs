@@ -1,34 +1,46 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Windows.Forms;
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
 
-using DisplayNodes.Fluent;
-using DisplayNodes.LibDisplayDrawingAdapter;
+using DisplayNodes.Core;
 using DisplayNodes.Playground.Compilation;
 using DisplayNodes.Playground.Infrastructure;
-
-using LibDisplayDrawing;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Windows.Forms;
+using Color = System.Drawing.Color;
+using Point = System.Drawing.Point;
+using Size = System.Drawing.Size;
 
 namespace DisplayNodes.Playground
 {
 	public partial class AppForm : Form
 	{
 		private readonly AppViewModel _vm;
-		private readonly ManagerTimers _timers = new ManagerTimers();
-		private readonly ManagerDisplays _displays;
 		private readonly AppSettings _appSettings = new AppSettings();
 		private readonly EditorSettings _settings = new EditorSettings();
 
-		private DisplayRoot _displayRoot;
-		private Timer _autoRunTimer;
-		private Timer _updateTimer;
-		private DateTime _lastTime;
-		private Timer _layoutDebounceTimer;
+		private IPreviewHost _preview;
 
-		// Делегат для cross-thread invoke
-		private delegate void DisplayPaintDelegate(string id, Bitmap bitmap);
+		private Timer _autoRunTimer;
+		private Timer _layoutDebounceTimer;
 
 		private bool _restoringState;
 		private bool _isRunning;
@@ -67,26 +79,19 @@ namespace DisplayNodes.Playground
 			InitializeComponent();
 			InitializeCodeEditor();
 
-			_displays = new ManagerDisplays(_timers, new[] { "preview" });
-			var preview = _displays["preview"];
-			preview.Size = new Size2D(_settings.PreviewDefaultWidth, _settings.PreviewDefaultHeight);
-			_displays.onPaint += OnDisplayPaint;
+			_preview = new WinFormsPreviewHost(previewHost);
 
-			_displayRoot = new DisplayRoot(new RenderRootFactory(preview, _timers));
+            _autoRunTimer = new Timer
+            {
+                Interval = _settings.AutoRunDebounceMs
+            };
+            _autoRunTimer.Tick += OnAutoRunTimerTick;
 
-			_autoRunTimer = new Timer();
-			_autoRunTimer.Interval = _settings.AutoRunDebounceMs;
-			_autoRunTimer.Tick += OnAutoRunTimerTick;
-
-			_updateTimer = new Timer();
-			_updateTimer.Interval = _settings.UpdateTimerInterval; // ~60 FPS
-			_updateTimer.Tick += OnUpdateTimerTick;
-			_updateTimer.Start();
-			_lastTime = DateTime.Now;
-
-			_layoutDebounceTimer = new Timer();
-			_layoutDebounceTimer.Interval = _settings.LayoutDebounceMs;
-			_layoutDebounceTimer.Tick += OnLayoutDebounceTick;
+            _layoutDebounceTimer = new Timer
+            {
+                Interval = _settings.LayoutDebounceMs
+            };
+            _layoutDebounceTimer.Tick += OnLayoutDebounceTick;
 
 			mainSplitter.SplitterMoved += OnSplitterMoved;
 			viewLogsSplitter.SplitterMoved += OnSplitterMoved;
@@ -137,10 +142,8 @@ namespace DisplayNodes.Playground
 			_settings.Save(_appSettings);
 			_appSettings.Save();
 
-			_displayRoot?.Dispose();
-			_displayRoot = null;
-			_updateTimer?.Dispose();
-			_updateTimer = null;
+			_preview?.Dispose();
+			_preview = null;
 			_layoutDebounceTimer?.Dispose();
 			_layoutDebounceTimer = null;
 			_autoRunTimer?.Dispose();
@@ -236,24 +239,11 @@ namespace DisplayNodes.Playground
             if (_vm.CurrentRoot == null)
                 return;
 
-            var clientSize = picPreview.ClientSize;
-            int width = clientSize.Width > 0 ? clientSize.Width : _settings.PreviewDefaultWidth;
-            int height = clientSize.Height > 0 ? clientSize.Height : _settings.PreviewDefaultHeight;
+            Core.Size size = _preview.CurrentSize;
+            _vm.CurrentRoot.Measure(size);
+            _vm.CurrentRoot.Arrange(new Rect(Core.Point.Empty, size));
 
-            var newSize = new Core.Size(width, height);
-
-            // 1. Обновляем размер корневого легаси-компонента напрямую
-            if (_displayRoot.Root != null)
-            {
-                _displayRoot.Root.Size = newSize;
-            }
-
-            // 2. Пересчитываем layout для существующего дерева
-            _vm.CurrentRoot.Measure(newSize);
-            _vm.CurrentRoot.Arrange(new Core.Rect(Core.Point.Empty, newSize));
-
-            // 3. Запрашиваем перерисовку у легаси-менеджера
-            _displays["preview"].Refresh();
+            _preview.Resize(size);
         }
 
 		private void SaveState()
@@ -462,14 +452,6 @@ namespace DisplayNodes.Playground
 			}
 		}
 
-		private void OnUpdateTimerTick(object sender, EventArgs e)
-		{
-			DateTime now = DateTime.Now;
-			float delta = (float)(now - _lastTime).TotalSeconds;
-			_lastTime = now;
-			_timers.CurrentTime = delta;
-		}
-
 		private void RunScript()
 		{
 			lstErrors.Items.Clear();
@@ -491,39 +473,33 @@ namespace DisplayNodes.Playground
 				}
 				codeEditor.SetErrorLines(errorLineNumbers);
 				lblStatus.Text = "\u2716 Ошибка сборки";
-				lblStatus.ForeColor = System.Drawing.Color.FromArgb(240, 100, 100);
+				lblStatus.ForeColor = Color.FromArgb(240, 100, 100);
 				return;
 			}
 
 			codeEditor.SetErrorLines(null);
 
 			if (_vm.CurrentRoot != null)
-			{
-				var clientSize = picPreview.ClientSize;
-				int width = clientSize.Width > 0 ? clientSize.Width : _settings.PreviewDefaultWidth;
-				int height = clientSize.Height > 0 ? clientSize.Height : _settings.PreviewDefaultHeight;
-
-				_displayRoot.Build(_vm.CurrentRoot, Core.Point.Empty, new Core.Size(width, height));
-				_displays["preview"].Refresh();
-			}
+            {
+                _preview.Build(_vm.CurrentRoot);
+            }
 
 			lblStatus.Text = "\u2714 Сборка успешна";
-			lblStatus.ForeColor = System.Drawing.Color.FromArgb(100, 220, 100);
+			lblStatus.ForeColor = Color.FromArgb(100, 220, 100);
 		}
 
 		private void ClearAll()
-		{
-			codeEditor.ResetText();
-			codeEditor.ResetUndo();
-			codeEditor.SetErrorLines(null);
-			lstErrors.Items.Clear();
-			picPreview.Image?.Dispose();
-			picPreview.Image = null;
-			_vm.Clear();
-			lblStatus.Text = "Очищено";
-			lblStatus.ForeColor = SystemColors.ControlText;
-			UpdateLineCol();
-		}
+        {
+            codeEditor.ResetText();
+            codeEditor.ResetUndo();
+            codeEditor.SetErrorLines(null);
+            lstErrors.Items.Clear();
+            _preview.Clear();
+            _vm.Clear();
+            lblStatus.Text = "Очищено";
+            lblStatus.ForeColor = SystemColors.ControlText;
+            UpdateLineCol();
+        }
 
 		private bool SaveScript()
 		{
@@ -559,22 +535,6 @@ namespace DisplayNodes.Playground
 			int firstOfLine = codeEditor.Editor.GetFirstCharIndexFromLine(line);
 			int col = index - firstOfLine;
 			lblLineCol.Text = string.Format("Ln {0}, Col {1}", line + 1, col + 1);
-		}
-
-		private void OnDisplayPaint(string id, Bitmap bitmap)
-		{
-			if (InvokeRequired)
-			{
-				BeginInvoke(new DisplayPaintDelegate(OnDisplayPaint), id, bitmap);
-				return;
-			}
-
-			if (bitmap != null)
-			{
-				Bitmap clone = new Bitmap(bitmap);
-				picPreview.Image?.Dispose();
-				picPreview.Image = clone;
-			}
 		}
 
 		private void OnAutoRunTimerTick(object sender, EventArgs e)
@@ -902,6 +862,93 @@ namespace DisplayNodes.Playground
                     _autoRunTimer.Interval = _settings.AutoRunDebounceMs;
                     _layoutDebounceTimer.Interval = _settings.LayoutDebounceMs;
                 }
+            }
+        }
+
+        private void BtnExportPreview_Click(object sender, EventArgs e) => ExportPreview();
+
+        /// <summary>
+        /// Сохраняет текущий preview в файл.
+        /// </summary>
+        /// <remarks>
+        /// Сохраняется <b>то, что уже отрисовано</b> в <see cref="picPreview"/>.
+        /// Размер изображения равен размеру <see cref="picPreview"/>.
+        /// </remarks>
+        private void ExportPreview()
+        {
+            Bitmap bmp = null;
+
+            try
+            {
+                bmp = _preview.ExportToBitmap();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error("AppForm.ExportPreview", ex);
+            }
+
+            if (bmp == null)
+            {
+                _ = MessageBox.Show(
+                    "Нет изображения для экспорта. Сначала выполните скрипт.",
+                    "Экспорт preview",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            using (bmp)
+            using (var dialog = new SaveFileDialog
+            {
+                Title = "Экспорт preview",
+                Filter = "PNG (*.png)|*.png|JPEG (*.jpg;*.jpeg)|*.jpg;*.jpeg|BMP (*.bmp)|*.bmp",
+                DefaultExt = "png",
+                FileName = "preview",
+                AddExtension = true,
+                OverwritePrompt = true
+            })
+            {
+                if (dialog.ShowDialog() != DialogResult.OK)
+                    return;
+
+                try
+                {
+                    ImageFormat format = GetImageFormatFromPath(dialog.FileName);
+                    bmp.Save(dialog.FileName, format);
+
+                    lblStatus.Text = "Preview сохранён: " + Path.GetFileName(dialog.FileName);
+                    lblStatus.ForeColor = SystemColors.ControlText;
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Error("AppForm.ExportPreview", ex);
+                    _ = MessageBox.Show(
+                        "Не удалось сохранить файл:\r\n" + ex.Message,
+                        "Ошибка экспорта",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Определяет формат изображения по расширению файла.
+        /// </summary>
+        private static ImageFormat GetImageFormatFromPath(string path)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+
+            switch (ext)
+            {
+                case ".png":
+                    return ImageFormat.Png;
+                case ".jpg":
+                case ".jpeg":
+                    return ImageFormat.Jpeg;
+                case ".bmp":
+                    return ImageFormat.Bmp;
+                default:
+                    return ImageFormat.Png;
             }
         }
     }

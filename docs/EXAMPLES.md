@@ -4,18 +4,29 @@
 
 ## Содержание
 
-1. [Инициализация](#инициализация)
-2. [Базовые типы](#базовые-типы)
-3. [Контейнеры](#контейнеры)
-4. [Виджеты](#виджеты)
-5. [Реактивность](#реактивность)
-6. [Эффекты](#эффекты)
-7. [Маски](#маски)
-8. [Полные примеры](#полные-примеры)
-9. [Best practices](#best-practices)
+1. [Инициализация](#init)
+2. [Базовые типы](#types)
+3. [Контейнеры](#containers)
+4. [Виджеты](#widgets)
+5. [Ограничения размеров](#constraints)
+6. [Flex-механика](#flex)
+7. [WrapPanel](#wrappanel)
+8. [Border](#border)
+9. [Реактивность](#observable)
+10. [ComputedObservable](#computed)
+11. [ObservableList](#observable-list)
+12. [ConditionalNode](#conditional)
+13. [Эффекты](#effects)
+14. [Градиенты](#gradients)
+15. [Shadow](#shadow)
+16. [TransformNode](#transform)
+17. [Маски](#masks)
+18. [Полные примеры](#full-examples)
+19. [Best practices](#best-practices)
 
 ---
 
+<a id="init"></a>
 ## Инициализация
 
 Перед использованием `UI.*` необходимо инициализировать фабрики. Вызовите **один раз** при старте приложения.
@@ -43,6 +54,7 @@ UI.ImageFactory = new GdiImageFactory();
 
 ---
 
+<a id="types"></a>
 ## Базовые типы
 
 ### Point
@@ -83,12 +95,8 @@ var taller = s1.WithHeight(400);  // (100, 400)
 
 // Inflate/Deflate (добавление/вычитание отступов)
 var t = new Thickness(10, 20);
-var inflated = s1.Inflate(t);     // (120, 240) = (100+20, 200+40)
-var deflated = s1.Deflate(t);     // (80, 160) = (100-20, 200-40)
-
-// Deflate никогда не возвращает отрицательные значения
-var small = new Size(10, 10);
-var safe = small.Deflate(new Thickness(20, 20));  // (0, 0), не (-30, -30)
+var inflated = s1.Inflate(t);     // (120, 240)
+var deflated = s1.Deflate(t);     // (80, 160)
 
 // Арифметика
 var sum = new Size(50, 50) + new Size(30, 40);    // (80, 90)
@@ -100,29 +108,27 @@ var diff = new Size(100, 100) - new Size(30, 40); // (70, 60)
 ```csharp
 using DisplayNodes.Core;
 
-// Создание прямоугольника
+// Создание
 var r1 = new Rect(10, 20, 100, 200);
 var r2 = new Rect(new Point(10, 20), new Size(100, 200));
-var r3 = Rect.Empty;  // (0, 0, 0, 0)
+var r3 = Rect.Empty;
 
 // Свойства
-int right = r1.Right;    // 110 (X + Width)
-int bottom = r1.Bottom;  // 220 (Y + Height)
-bool isEmpty = r1.IsEmpty;  // false
+int right = r1.Right;    // 110
+int bottom = r1.Bottom;  // 220
 
 // Inflate/Deflate
 var t = new Thickness(10, 20);
-var inflated = r1.Inflate(t);   // (0, 0, 120, 240)
-var deflated = r1.Deflate(t);   // (20, 40, 80, 160)
+var inflated = r1.Inflate(t);
+var deflated = r1.Deflate(t);
 
 // Проверка содержимого
-bool containsPoint = r1.Contains(new Point(50, 50));   // true
-bool containsRect = r1.Contains(new Rect(20, 30, 50, 50));  // true
+bool containsPoint = r1.Contains(new Point(50, 50));
+bool containsRect = r1.Contains(new Rect(20, 30, 50, 50));
 
 // Пересечение
-bool intersects = r1.IntersectsWith(new Rect(50, 50, 100, 100));  // true
+bool intersects = r1.IntersectsWith(new Rect(50, 50, 100, 100));
 var intersection = r1.Intersect(new Rect(50, 50, 100, 100));
-// intersection = (50, 50, 60, 170)
 ```
 
 ### Thickness
@@ -130,19 +136,18 @@ var intersection = r1.Intersect(new Rect(50, 50, 100, 100));
 ```csharp
 using DisplayNodes.Core;
 
-// Создание отступов
 var t1 = new Thickness(10);              // все стороны = 10
 var t2 = new Thickness(10, 20);          // горизонталь = 10, вертикаль = 20
 var t3 = new Thickness(10, 20, 30, 40);  // L=10, T=20, R=30, B=40
-var t4 = Thickness.Zero;                 // (0, 0, 0, 0)
+var t4 = Thickness.Zero;
 
 // Свойства
-int horizontal = t3.Horizontal;  // 40 (Left + Right)
-int vertical = t3.Vertical;      // 60 (Top + Bottom)
+int horizontal = t3.Horizontal;  // 40
+int vertical = t3.Vertical;      // 60
 bool isZero = t4.IsZero;         // true
 
 // Сложение
-var sum = t1 + t2;  // (20, 30, 20, 30)
+var sum = t1 + t2;
 ```
 
 ### Color
@@ -150,30 +155,54 @@ var sum = t1 + t2;  // (20, 30, 20, 30)
 ```csharp
 using DisplayNodes.Core;
 
-// Создание цвета
-var c1 = new Color(255, 0, 0);           // красный, alpha = 255
-var c2 = Color.FromArgb(128, 255, 0, 0); // полупрозрачный красный
-var c3 = Color.FromRgb(0, 255, 0);       // зелёный, alpha = 255
+var c1 = new Color(255, 0, 0);
+var c2 = Color.FromArgb(128, 255, 0, 0);
+var c3 = Color.FromRgb(0, 255, 0);
 
-// Предопределённые цвета
+// Предопределённые
 var black = Color.Black;
 var white = Color.White;
 var red = Color.Red;
-var green = Color.Green;
-var blue = Color.Blue;
 var transparent = Color.Transparent;
 
 // Сравнение
 bool equal = c1 == Color.Red;  // true
 ```
 
+### Percent
+
+```csharp
+using DisplayNodes.Core;
+
+// Значение в диапазоне [0..100]
+var p1 = new Percent(50);       // 50%
+var p2 = Percent.Zero;          // 0%
+var p3 = Percent.Hundred;       // 100%
+
+// Неявное преобразование из int
+Percent p4 = 75;                // 75%
+int value = p4;                 // 75
+
+// Валидация: ArgumentOutOfRangeException при выходе за диапазон
+// var invalid = new Percent(101);  // исключение
+```
+
+### GradientStop
+
+```csharp
+using DisplayNodes.Core;
+
+var stop1 = new GradientStop(Color.Red, 0);       // 0% — красный
+var stop2 = new GradientStop(Color.Blue, 100);    // 100% — синий
+var stop3 = new GradientStop(Color.Green, 50);    // 50% — зелёный
+```
+
 ---
 
+<a id="containers"></a>
 ## Контейнеры
 
 ### StackLayoutNode (Row / Column)
-
-Располагает детей в строку или столбец.
 
 #### Вертикальный стек (Column)
 
@@ -182,16 +211,13 @@ using DisplayNodes.Fluent;
 using DisplayNodes.Core;
 
 var font = UI.Font("Segoe UI", 14f);
-var brush = UI.Brush(Color.White);
+var brush = UI.SolidBrush(Color.White);
 
 var column = UI.Column(spacing: 8)
     .Padding(20)
     .Add(UI.Label("Первый", font, brush))
     .Add(UI.Label("Второй", font, brush))
     .Add(UI.Label("Третий", font, brush));
-
-// Размер: сумма высот детей + spacing + padding
-// DesiredSize = (maxWidth + 40, sumHeights + 16 + 40)
 ```
 
 #### Горизонтальный стек (Row)
@@ -199,12 +225,10 @@ var column = UI.Column(spacing: 8)
 ```csharp
 var row = UI.Row(spacing: 12)
     .Add(UI.Label("Логин:", font, brush))
-    .Add(UI.Label("admin", font, UI.Brush(Color.LimeGreen)));
-
-// Размер: сумма ширин детей + spacing
+    .Add(UI.Label("admin", font, UI.SolidBrush(Color.LimeGreen)));
 ```
 
-#### Выравнивание по главной оси (MainAxisAlignment)
+#### MainAxisAlignment
 
 ```csharp
 // Прижать к началу (по умолчанию)
@@ -235,10 +259,6 @@ var spaceBetween = UI.Column(8)
 
 ### GridNode
 
-Сетка с произвольными размерами строк/колонок.
-
-#### Базовая сетка
-
 ```csharp
 var grid = UI.Grid()
     .Add(UI.Label("A", font, brush), row: 0, column: 0)
@@ -246,61 +266,25 @@ var grid = UI.Grid()
     .Add(UI.Label("C", font, brush), row: 1, column: 0)
     .Add(UI.Label("D", font, brush), row: 1, column: 1);
 
-// Добавить определения строк и колонок
 grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 grid.RowDefinitions.Add(new RowDefinition(GridLength.Star(1)));
 grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Pixels(100)));
 grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star(2)));
 ```
 
-#### Типы размеров (GridLength)
+**Типы размеров (GridLength):**
 
 ```csharp
-// Фиксированный размер в пикселях
-var pixel = GridLength.Pixels(100);
-
-// По содержимому (автоматически)
-var auto = GridLength.Auto;
-
-// Пропорционально свободному месту
-var star1 = GridLength.Star(1);  // коэффициент 1
-var star2 = GridLength.Star(2);  // коэффициент 2 (в 2 раза больше)
-var starDefault = GridLength.Star();  // коэффициент 1 (по умолчанию)
-```
-
-#### Пример: форма с фиксированной и растягивающейся частью
-
-```csharp
-var form = UI.Grid()
-    .Padding(10);
-
-// Строки: заголовок (auto), контент (star), кнопки (auto)
-form.RowDefinitions.Add(new RowDefinition(GridLength.Auto));    // заголовок
-form.RowDefinitions.Add(new RowDefinition(GridLength.Star(1))); // контент
-form.RowDefinitions.Add(new RowDefinition(GridLength.Auto));    // кнопки
-
-// Колонки: лейбл (auto), поле ввода (star)
-form.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-form.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star(1)));
-
-// Заполнение
-form.Add(UI.Label("Имя:", font, brush), 0, 0);
-form.Add(UI.Label("Описание:", font, brush), 1, 0);
-form.Add(UI.Label("Поле ввода...", font, grayBrush), 0, 1);
-form.Add(UI.Label("Многострочное поле...", font, grayBrush), 1, 1);
-form.Add(UI.Label("Заголовок формы", font, brush), 2, 0);
-// Кнопки в последней строке
-form.Add(UI.Row(8)
-    .Add(UI.Label("OK", font, brush))
-    .Add(UI.Label("Отмена", font, brush)), 2, 1);
+var pixel = GridLength.Pixels(100);   // фиксированный
+var auto = GridLength.Auto;            // по содержимому
+var star1 = GridLength.Star(1);        // пропорционально (вес 1)
+var star2 = GridLength.Star(2);        // пропорционально (вес 2)
+var starDefault = GridLength.Star();   // вес 1 по умолчанию
 ```
 
 ### UniformGridNode
 
-Равномерная сетка с фиксированным числом строк/колонок. Все ячейки одинакового размера.
-
 ```csharp
-// Сетка 3x3 с расстоянием 10px между ячейками
 var uniformGrid = UI.UniformGrid(rows: 3, columns: 3, spacing: 10)
     .Add(UI.Label("1", font, brush))
     .Add(UI.Label("2", font, brush))
@@ -311,26 +295,17 @@ var uniformGrid = UI.UniformGrid(rows: 3, columns: 3, spacing: 10)
     .Add(UI.Label("7", font, brush))
     .Add(UI.Label("8", font, brush))
     .Add(UI.Label("9", font, brush));
-
-// Размер ячейки = max(доступное_пространство / columns, maxChildSize)
 ```
 
 ### OverlayNode
 
-Размещает всех детей в одном слоте (друг поверх друга).
-
 ```csharp
 var overlay = UI.Overlay()
-    .Add(UI.Background(Color.Blue))  // фон
-    .Add(UI.Label("Текст поверх фона", font, brush));  // контент
-
-// Размер overlay = размер наибольшего ребёнка
-// Все дети получают одинаковый слот
+    .Add(UI.Background(Color.Blue))
+    .Add(UI.Label("Текст поверх фона", font, brush));
 ```
 
 ### FixedNode (Spacer)
-
-Узел с фиксированным размером. Полезен для распорок.
 
 ```csharp
 // Распорка высотой 20px
@@ -342,44 +317,35 @@ var spacer2 = UI.Spacer(0, 20);
 // Использование в стеке
 var column = UI.Column(0)
     .Add(UI.Label("Верх", font, brush))
-    .Add(UI.Fixed(0, 40))  // отступ 40px
+    .Add(UI.Fixed(0, 40))
     .Add(UI.Label("Низ", font, brush));
 ```
 
 ---
 
+<a id="widgets"></a>
 ## Виджеты
 
 ### LabelNode
 
-Текстовая метка.
-
-#### Базовое использование
-
 ```csharp
+// Базовое использование
 var label = UI.Label("Hello, World!", font, brush);
 
 // С фиксированным размером
 var fixedLabel = UI.Label("Fixed", font, brush)
     .SetSize(200, 50);
-```
 
-#### Фон метки
-
-```csharp
+// С фоном
 var labelWithBg = UI.Label("Текст", font, brush)
-    .FullBrush(Color.Blue);  // цвет фона
+    .BackgroundBrush(Color.Blue);
 
 // Или через IBrush
-var customBrush = UI.Brush(Color.FromArgb(128, 0, 0, 255));
+var customBrush = UI.SolidBrush(Color.FromArgb(128, 0, 0, 255));
 var labelWithCustomBg = UI.Label("Текст", font, brush)
-    .FullBrush(customBrush);
-```
+    .BackgroundBrush(customBrush);
 
-#### Форматирование текста
-
-```csharp
-// Режим растяжки текста
+// Растягивание текста
 var stretched = UI.Label("Длинный текст", font, brush)
     .SetSize(100, 50)
     .Stretch(LabelStretch.Horizontal);
@@ -397,10 +363,6 @@ var wrapped = UI.Label("Очень длинный текст, который н�
 
 ### ImageNode
 
-Изображение.
-
-#### Базовое использование
-
 ```csharp
 // Из файла
 var image = UI.Image(UI.ImageFromFile("icon.png"));
@@ -411,55 +373,179 @@ using (var stream = File.OpenRead("image.jpg"))
     var imageFromStream = UI.Image(UI.ImageFromStream(stream));
 }
 
-// Из байт
+// Из байтов
 byte[] bytes = File.ReadAllBytes("image.png");
 var imageFromBytes = UI.Image(UI.ImageFromBytes(bytes));
 
 // С фиксированным размером
 var sizedImage = UI.Image(UI.ImageFromFile("logo.png"))
     .SetSize(200, 150);
-```
 
-#### Режим отображения
-
-```csharp
 // Оригинальный размер (центрируется)
 var normal = UI.Image(UI.ImageFromFile("icon.png"))
     .SizeMode(ImageSizeMode.Normal);
 
-// Растягивание с сохранением пропорций
+// Растягивание
 var stretch = UI.Image(UI.ImageFromFile("background.jpg"))
     .SizeMode(ImageSizeMode.Stretch);
 ```
 
 ### BackgroundNode
 
-Фон. Растягивается на весь слот, `DesiredSize = 0`.
-
 ```csharp
 // Простой цветной фон
 var bg = UI.Background(Color.Blue);
 
-// Использование в overlay
+// Через IBrush
+var bgWithBrush = UI.Background(UI.SolidBrush(Color.FromArgb(240, 240, 245)));
+
+// В overlay
 var overlay = UI.Overlay()
     .Add(UI.Background(Color.FromArgb(240, 240, 245)))
     .Add(UI.Label("Контент", font, brush));
-
-// В стеке (фон занимает весь слот)
-var column = UI.Column(0)
-    .Add(UI.Background(Color.DarkBlue))
-    .Add(UI.Label("Текст", font, brush));
 ```
 
 ---
 
+<a id="constraints"></a>
+## Ограничения размеров
+
+`LayoutNode` поддерживает `MinWidth`, `MaxWidth`, `MinHeight`, `MaxHeight`. Применяются в базовом `Measure` после `MeasureOverride`.
+
+```csharp
+// Через fluent API
+var label = UI.Label("Текст", font, brush)
+    .MinWidth(100)
+    .MaxWidth(400)
+    .MinHeight(30)
+    .MaxHeight(200);
+
+// Или через диапазон
+var label2 = UI.Label("Текст", font, brush)
+    .WidthRange(100, 400)
+    .HeightRange(30, 200);
+
+// Через свойства
+var label3 = UI.Label("Текст", font, brush);
+label3.MinWidth = 100;
+label3.MaxWidth = 400;
+```
+
+**Поведение:**
+- Если `DesiredSize.Width < MinWidth` — итоговый размер = `MinWidth`.
+- Если `DesiredSize.Width > MaxWidth` — итоговый размер = `MaxWidth`.
+- `Margin` прибавляется **после** ограничений — `MaxWidth` ограничивает контент, а не полный размер с margin.
+
+---
+
+<a id="flex"></a>
+## Flex-механика
+
+`StackLayoutNode` поддерживает `FlexWeight` — пропорциональное распределение свободного пространства.
+
+```csharp
+// Flex-ребёнок растягивается на всё свободное место
+var column = UI.Column(8)
+    .Add(UI.Label("Fixed", font, brush))               // обычный размер
+    .Add(UI.Label("Flexible", font, brush).Flex(1));    // забирает остаток
+
+// Два flex-ребёнка делят место пропорционально
+var column2 = UI.Column(0)
+    .Add(UI.Label("1/3", font, brush).Flex(1))         // 1 доля из 3
+    .Add(UI.Label("2/3", font, brush).Flex(2));        // 2 доли из 3
+```
+
+**Поведение:**
+- `FlexWeight == 0` (по умолчанию) — узел имеет фиксированный размер.
+- `FlexWeight > 0` — узел получает долю свободного места пропорционально весу.
+- Если свободного места нет (`free == 0`) — flex-дети остаются в natural размере.
+- Если места не хватает (`free < 0`) — flex-дети сжимаются, fixed — нет.
+
+### StretchNode
+
+`StretchNode` — публичный узел, растягивающийся вдоль обеих осей. Полезен как flex-ребёнок:
+
+```csharp
+var column = UI.Column(8)
+    .Add(UI.Label("Top", font, brush))
+    .Add(new StretchNode(0, 0).Flex(1))   // растягивается на всё свободное место
+    .Add(UI.Label("Bottom", font, brush));
+```
+
+---
+
+<a id="wrappanel"></a>
+## WrapPanel
+
+`WrapPanelNode` — контейнер с автоматическим переносом детей на следующую строку/столбец.
+
+```csharp
+// Горизонтальный wrap (строки, перенос вниз)
+var horizontal = UI.WrapPanel(
+    direction: WrapDirection.Horizontal,
+    spacing: 8,        // между детьми в строке
+    lineSpacing: 4)    // между строками
+    .Add(UI.Label("Tag 1", font, brush))
+    .Add(UI.Label("Tag 2", font, brush))
+    .Add(UI.Label("Tag 3", font, brush))
+    .Add(UI.Label("Tag 4", font, brush));
+
+// Вертикальный wrap (столбцы, перенос вправо)
+var vertical = UI.WrapPanel(
+    direction: WrapDirection.Vertical,
+    spacing: 8,
+    lineSpacing: 4)
+    .Add(UI.Label("Item 1", font, brush))
+    .Add(UI.Label("Item 2", font, brush));
+```
+
+**Поведение:**
+- Если ребёнок помещается в текущую строку — добавляется.
+- Если не помещается — начинается новая строка.
+- Если ребёнок шире `available` — остаётся в строке и переполняет (не переносится бесконечно).
+
+---
+
+<a id="border"></a>
+## Border
+
+`UI.Border` — композиция `OverlayNode` + `ClipNode` + `BackgroundNode`. Возвращает `OverlayNode` с фоном внутри.
+
+```csharp
+// С прямоугольной маской
+var border = UI.Border(UI.SolidBrush(Color.Gray))
+    .Add(UI.Label("Content", font, brush).Padding(12));
+
+// Со скруглёнными углами
+var rounded = UI.Border(UI.SolidBrush(Color.FromArgb(45, 45, 48)), cornerRadius: 8)
+    .Padding(12)
+    .Add(UI.Label("Rounded", font, brush));
+
+// С цветом напрямую
+var withColor = UI.Border(Color.Blue, cornerRadius: 4)
+    .Padding(8)
+    .Add(UI.Label("Blue", font, brush));
+
+// С градиентом (при поддержке в адаптере)
+var withGradient = UI.Border(
+    UI.LinearGradient(
+        new Point(0, 0), new Point(0, 100),
+        new GradientStop(Color.Blue, 0),
+        new GradientStop(Color.White, 100)),
+    cornerRadius: 8)
+    .Add(UI.Label("Gradient", font, brush).Padding(12));
+```
+
+**Структура:**
+- Первый ребёнок `OverlayNode` — `ClipNode` с `BackgroundNode` внутри.
+- Контент, добавленный через `.Add(...)`, рисуется **поверх** фона.
+
+---
+
+<a id="observable"></a>
 ## Реактивность
 
-### Observable<T>
-
-Реактивное свойство с подпиской на изменения.
-
-#### Базовое использование
+### Observable\<T\>
 
 ```csharp
 using DisplayNodes.Core;
@@ -483,24 +569,22 @@ subscription.Dispose();
 counter.Value = 20;  // ничего не выведет
 ```
 
-#### Привязка к виджетам
+### Привязка к виджетам
 
 ```csharp
 var textObservable = new Observable<string>("Начальное значение");
-var colorObservable = new Observable<IBrush>(UI.Brush(Color.White));
+var colorObservable = new Observable<IBrush>(UI.SolidBrush(Color.White));
 
 var label = UI.Label("Текст", font, brush)
     .BindText(textObservable)
-    .BindBrush(colorObservable);
+    .BindForegroundBrush(colorObservable);
 
 // Изменение автоматически обновит UI
 textObservable.Value = "Новый текст";
-colorObservable.Value = UI.Brush(Color.LimeGreen);
-
-// Подписки автоматически отписываются при Dispose виджета
+colorObservable.Value = UI.SolidBrush(Color.LimeGreen);
 ```
 
-#### Привязка видимости
+### Привязка видимости
 
 ```csharp
 var isVisible = new Observable<bool>(true);
@@ -512,7 +596,7 @@ isVisible.Value = false;  // метка скроется
 isVisible.Value = true;   // метка появится
 ```
 
-#### Привязка эффектов
+### Привязка эффектов
 
 ```csharp
 var opacity = new Observable<double>(100.0);
@@ -524,12 +608,12 @@ var image = UI.Image(UI.ImageFromFile("photo.jpg"))
     .BindBrightness(brightness)
     .BindContrast(contrast);
 
-opacity.Value = 50.0;      // прозрачность 50%
-brightness.Value = 20.0;   // яркость +20
-contrast.Value = -10.0;    // контраст -10
+opacity.Value = 50.0;
+brightness.Value = 20.0;
+contrast.Value = -10.0;
 ```
 
-#### Привязка изображения
+### Привязка изображения
 
 ```csharp
 var imageObservable = new Observable<IImage>(UI.ImageFromFile("default.png"));
@@ -537,10 +621,10 @@ var imageObservable = new Observable<IImage>(UI.ImageFromFile("default.png"));
 var imageNode = UI.Image()
     .BindBitmap(imageObservable);
 
-imageObservable.Value = UI.ImageFromFile("new.png");  // изображение обновится
+imageObservable.Value = UI.ImageFromFile("new.png");
 ```
 
-#### Привязка режима отображения
+### Привязка режима отображения
 
 ```csharp
 var sizeModeObservable = new Observable<ImageSizeMode>(ImageSizeMode.Normal);
@@ -548,11 +632,166 @@ var sizeModeObservable = new Observable<ImageSizeMode>(ImageSizeMode.Normal);
 var imageNode = UI.Image(UI.ImageFromFile("icon.png"))
     .BindSizeMode(sizeModeObservable);
 
-sizeModeObservable.Value = ImageSizeMode.Stretch;  // режим изменится
+sizeModeObservable.Value = ImageSizeMode.Stretch;
+```
+
+### Привязка шрифта и фона
+
+```csharp
+var fontObservable = new Observable<IFont>(font);
+var backgroundObservable = new Observable<IBrush>(UI.SolidBrush(Color.Black));
+
+var label = UI.Label("Text", font, brush)
+    .BindFont(fontObservable)
+    .BindBackgroundBrush(backgroundObservable);
 ```
 
 ---
 
+<a id="computed"></a>
+## ComputedObservable
+
+`ComputedObservable<T>` — реактивное свойство, значение которого вычисляется из других источников.
+
+```csharp
+using DisplayNodes.Core;
+
+var firstName = new Observable<string>("Ivan");
+var lastName = new Observable<string>("Petrov");
+
+var fullName = new ComputedObservable<string>(
+    () => firstName.Value + " " + lastName.Value,
+    firstName,
+    lastName);
+
+// fullName.Value == "Ivan Petrov"
+firstName.Value = "Petr";
+// fullName.Value == "Petr Petrov" (автоматически)
+
+// Подписка на изменения
+var subscription = fullName.Subscribe(v => Console.WriteLine(v));
+
+// Ручной пересчёт (если зависимости изменились в обход Observable)
+fullName.Refresh();
+
+// Освобождение
+fullName.Dispose();
+```
+
+### Chained computed
+
+```csharp
+var a = new Observable<int>(1);
+var doubled = new ComputedObservable<int>(() => a.Value * 2, a);
+var quadrupled = new ComputedObservable<int>(() => doubled.Value * 2, doubled);
+
+// quadrupled.Value == 4
+a.Value = 5;
+// quadrupled.Value == 20
+```
+
+### С разнотипными зависимостями
+
+```csharp
+var num = new Observable<int>(10);
+var text = new Observable<string>("Hello");
+
+var result = new ComputedObservable<string>(
+    () => text.Value + ": " + num.Value,
+    num, text);
+
+// result.Value == "Hello: 10"
+num.Value = 20;
+// result.Value == "Hello: 20"
+```
+
+---
+
+<a id="observable-list"></a>
+## ObservableList
+
+`ObservableList<T>` — реактивная коллекция с событием `Changed`.
+
+```csharp
+using DisplayNodes.Core;
+
+var list = new ObservableList<string>();
+
+list.Changed += change =>
+{
+    Console.WriteLine($"{change.Type} at {change.NewIndex}: {change.Item}");
+};
+
+list.Add("Item 1");          // Add at 0: Item 1
+list.Add("Item 2");          // Add at 1: Item 2
+list.Insert(1, "Inserted");  // Insert at 1: Inserted
+list.RemoveAt(0);            // Remove at 0: Item 1
+list[0] = "Replaced";        // Replace at 0: Replaced
+list.Move(0, 1);             // Move [0→1]: Replaced
+list.Clear();                // Reset
+
+// Снимок для безопасного перебора
+foreach (var item in list.ToList())
+{
+    // Можно модифицировать list без InvalidOperationException
+}
+
+// Освобождение
+list.Dispose();
+```
+
+### Типы изменений
+
+| Тип | OldIndex | NewIndex | Item |
+|---|---|---|---|
+| `Add` | -1 | индекс | добавленный |
+| `Insert` | -1 | индекс | вставленный |
+| `Remove` | индекс | -1 | удалённый |
+| `Replace` | индекс | индекс | новый |
+| `Move` | откуда | куда | перемещённый |
+| `Reset` | -1 | -1 | default |
+
+---
+
+<a id="conditional"></a>
+## ConditionalNode
+
+`ConditionalNode` (через `UI.When`) — контейнер, отображающий одно из двух поддеревьев по `Observable<bool>`.
+
+```csharp
+var isLoggedIn = new Observable<bool>(false);
+
+var conditional = UI.When(
+    isLoggedIn,
+    trueNode: UI.Label("Welcome!", font, greenBrush),
+    falseNode: UI.Label("Please log in", font, grayBrush));
+
+// При isLoggedIn.Value = true отображается "Welcome!"
+// При isLoggedIn.Value = false отображается "Please log in"
+
+// Подписка на переключение
+conditional.OnChanged(value =>
+{
+    Console.WriteLine($"Condition changed to: {value}");
+});
+```
+
+**Ограничение:** `ConditionalNode` **не пересчитывает layout автоматически** при переключении. Пользователь должен вызвать `Measure`+`Arrange`+`Refresh` вручную или перестроить дерево целиком.
+
+### Только true-ветка
+
+```csharp
+var isLoading = new Observable<bool>(true);
+
+var conditional = UI.When(
+    isLoading,
+    trueNode: UI.Label("Loading...", font, grayBrush));
+    // falseNode не задан — при false отображается пустота
+```
+
+---
+
+<a id="effects"></a>
 ## Эффекты
 
 Применяются к виджетам, чей компонент реализует `IEffectComponent` (Label, Image).
@@ -560,7 +799,6 @@ sizeModeObservable.Value = ImageSizeMode.Stretch;  // режим изменит�
 ### Opacity (прозрачность)
 
 ```csharp
-// Прозрачность 0-100
 var semiTransparent = UI.Label("Полупрозрачный", font, brush)
     .Opacity(50.0);
 
@@ -571,7 +809,6 @@ var image = UI.Image(UI.ImageFromFile("photo.jpg"))
 ### Brightness (яркость)
 
 ```csharp
-// Яркость -100...100
 var darker = UI.Image(UI.ImageFromFile("photo.jpg"))
     .Brightness(-30.0);
 
@@ -582,7 +819,6 @@ var brighter = UI.Image(UI.ImageFromFile("photo.jpg"))
 ### Contrast (контраст)
 
 ```csharp
-// Контраст -100...100
 var lowContrast = UI.Image(UI.ImageFromFile("photo.jpg"))
     .Contrast(-20.0);
 
@@ -590,7 +826,7 @@ var highContrast = UI.Image(UI.ImageFromFile("photo.jpg"))
     .Contrast(40.0);
 ```
 
-### Комбинация эффектов
+### Комбинирование
 
 ```csharp
 var styledImage = UI.Image(UI.ImageFromFile("photo.jpg"))
@@ -601,75 +837,138 @@ var styledImage = UI.Image(UI.ImageFromFile("photo.jpg"))
 
 ---
 
+<a id="gradients"></a>
+## Градиенты
+
+> **Ограничение:** адаптеры **не поддерживают** градиентные кисти. Установка градиента в компонент приводит к `NotSupportedException`. API подготовлен для будущей реализации.
+
+### Линейный градиент
+
+```csharp
+var gradient = UI.LinearGradient(
+    new Point(0, 0),      // начало: левый верхний угол
+    new Point(100, 0),    // конец: правый верхний угол
+    new GradientStop(Color.Red, 0),
+    new GradientStop(Color.Blue, 100));
+
+var bg = UI.Background(gradient);
+```
+
+### Радиальный градиент
+
+```csharp
+var radial = UI.RadialGradient(
+    new Point(50, 50),    // центр
+    radius: 50,            // радиус в процентах
+    new GradientStop(Color.White, 0),
+    new GradientStop(Color.Black, 100));
+
+var bg = UI.Background(radial);
+```
+
+### Многостоповый градиент
+
+```csharp
+var rainbow = UI.LinearGradient(
+    new Point(0, 0), new Point(100, 0),
+    new GradientStop(Color.Red, 0),
+    new GradientStop(Color.Yellow, 25),
+    new GradientStop(Color.Green, 50),
+    new GradientStop(Color.Cyan, 75),
+    new GradientStop(Color.Blue, 100));
+```
+
+---
+
+<a id="shadow"></a>
+## Shadow
+
+> **Ограничение:** адаптеры **бросают `NotSupportedException`** при попытке установить тень. API подготовлен для будущей реализации.
+
+```csharp
+// Три перегрузки:
+// 1. Готовая структура Shadow
+var shadow1 = new Shadow(2, 4, 8, Color.FromArgb(80, 0, 0, 0));
+var card1 = UI.Border(Color.White).Shadow(shadow1);
+
+// 2. С явным цветом
+var card2 = UI.Border(Color.White).Shadow(2, 4, 8, Color.FromArgb(80, 0, 0, 0));
+
+// 3. Со стандартным цветом (полупрозрачный чёрный, RGBA = 0,0,0,80)
+var card3 = UI.Border(Color.White).Shadow(2, 4, 8);
+```
+
+---
+
+<a id="transform"></a>
+## TransformNode
+
+> **Ограничение:** `ApplyRecursive` **бросает `NotSupportedException`** при обнаружении `TransformNode`. Layout для `TransformNode` работает корректно — исключение возникает только при попытке рендеринга.
+
+### Поворот
+
+```csharp
+var rotated = UI.Transform(rotation: 45f)
+    .Add(UI.Label("Rotated", font, brush));
+```
+
+### Масштабирование
+
+```csharp
+var scaled = UI.Transform(scaleX: 1.5f, scaleY: 1.5f)
+    .Add(UI.Label("Scaled", font, brush));
+```
+
+### Явный origin
+
+```csharp
+var rotatedAroundTopLeft = UI.Transform(
+    scaleX: 1f, scaleY: 1f, rotation: 90f,
+    origin: new Point(0, 0))
+    .Add(UI.Label("Rotated around top-left", font, brush));
+```
+
+### Bounding box учитывается в layout
+
+`TransformNode.Measure` возвращает bounding box трансформированного ребёнка, поэтому родительские контейнеры резервируют правильное место:
+
+```csharp
+UI.Column(spacing: 8)
+    .Add(UI.Transform(rotation: 45f)
+        .Add(UI.Fixed(100, 100)))
+    // bounding box ~142x142
+    .Add(UI.Label("Below", font, brush));  // расположится ниже, без перекрытия
+```
+
+---
+
+<a id="masks"></a>
 ## Маски
 
 ### ClipNode
 
-Контейнер-маска. Обрезает содержимое по форме маски.
-
-#### Прямоугольная маска (по умолчанию)
-
 ```csharp
+// Прямоугольная маска (по умолчанию)
 var clip = UI.Clip()
     .Add(UI.Image(UI.ImageFromFile("photo.jpg")));
 
-// Обрезает по прямоугольнику (эквивалентно отсутствию маски)
-```
-
-#### Круговая маска
-
-```csharp
+// Круговая маска
 var circleClip = UI.ClipCircle()
     .Add(UI.Image(UI.ImageFromFile("avatar.png")));
 
-// Обрезает изображение в круг
-```
-
-#### Эллиптическая маска
-
-```csharp
+// Эллиптическая маска
 var ellipseClip = UI.ClipEllipse()
     .Add(UI.Image(UI.ImageFromFile("photo.jpg")));
 
-// Обрезает в эллипс
-```
-
-#### Скруглённые углы
-
-```csharp
+// Скруглённые углы
 var roundedClip = UI.ClipRoundedRect(cornerRadius: 8f)
     .Add(UI.Image(UI.ImageFromFile("card.png")));
 
-// Скруглённые углы радиусом 8px
-```
-
-#### Произвольная форма
-
-```csharp
+// Произвольная форма
 var customClip = UI.ClipPath(rect =>
 {
     var path = new System.Drawing.Drawing2D.GraphicsPath();
-    
-    // Звезда
-    float centerX = rect.Width / 2;
-    float centerY = rect.Height / 2;
-    float outerRadius = Math.Min(rect.Width, rect.Height) / 2;
-    float innerRadius = outerRadius / 2;
-    
-    for (int i = 0; i < 10; i++)
-    {
-        float angle = (float)(i * Math.PI / 5);
-        float radius = (i % 2 == 0) ? outerRadius : innerRadius;
-        float x = centerX + radius * (float)Math.Cos(angle);
-        float y = centerY + radius * (float)Math.Sin(angle);
-        
-        if (i == 0)
-            path.AddLine(x, y, x, y);
-        else
-            path.AddLine(x, y, x, y);
-    }
-    path.CloseFigure();
-    
+    // ... логика рисования пути внутри rect ...
     return new DisplayNodes.Gdi.GdiGraphicsPath(path);
 })
 .Add(UI.Image(UI.ImageFromFile("star.png")));
@@ -677,6 +976,7 @@ var customClip = UI.ClipPath(rect =>
 
 ---
 
+<a id="full-examples"></a>
 ## Полные примеры
 
 ### Пример 1: Простая форма с логином
@@ -689,10 +989,10 @@ using DisplayNodes.Fluent;
 public static LayoutNode BuildLoginForm()
 {
     var font = UI.Font("Segoe UI", 14f);
-    var whiteBrush = UI.Brush(Color.White);
-    var grayBrush = UI.Brush(Color.Gray);
-    var greenBrush = UI.Brush(Color.LimeGreen);
-    
+    var whiteBrush = UI.SolidBrush(Color.White);
+    var grayBrush = UI.SolidBrush(Color.Gray);
+    var greenBrush = UI.SolidBrush(Color.LimeGreen);
+
     return UI.Column(12)
         .Padding(20)
         .Add(UI.Background(Color.FromArgb(45, 45, 48)))
@@ -708,9 +1008,9 @@ public static LayoutNode BuildLoginForm()
         .Add(UI.Row(12)
             .MainAlignment(MainAxisAlignment.Center)
             .Add(UI.Label("Войти", font, whiteBrush)
-                .FullBrush(Color.FromArgb(0, 120, 215)))
+                .BackgroundBrush(Color.FromArgb(0, 120, 215)))
             .Add(UI.Label("Отмена", font, whiteBrush)
-                .FullBrush(Color.FromArgb(80, 80, 80))));
+                .BackgroundBrush(Color.FromArgb(80, 80, 80))));
 }
 ```
 
@@ -720,9 +1020,10 @@ public static LayoutNode BuildLoginForm()
 public static LayoutNode BuildUserCard(string name, string role, string avatarPath)
 {
     var font = UI.Font("Segoe UI", 14f);
-    var whiteBrush = UI.Brush(Color.White);
-    var grayBrush = UI.Brush(Color.Gray);
-    
+    var smallFont = UI.Font("Segoe UI", 12f);
+    var whiteBrush = UI.SolidBrush(Color.White);
+    var grayBrush = UI.SolidBrush(Color.Gray);
+
     return UI.Overlay()
         .Add(UI.Background(Color.FromArgb(250, 250, 250)))
         .Add(UI.Column(12)
@@ -733,7 +1034,7 @@ public static LayoutNode BuildUserCard(string name, string role, string avatarPa
                         .SetSize(60, 60)))
                 .Add(UI.Column(4)
                     .Add(UI.Label(name, font, whiteBrush))
-                    .Add(UI.Label(role, UI.Font("Segoe UI", 12f), grayBrush))))
+                    .Add(UI.Label(role, smallFont, grayBrush))))
             .Add(UI.Fixed(0, 8))
             .Add(UI.Label("Email: user@example.com", font, grayBrush))
             .Add(UI.Label("Телефон: +7 (999) 123-45-67", font, grayBrush)));
@@ -745,27 +1046,22 @@ public static LayoutNode BuildUserCard(string name, string role, string avatarPa
 ```csharp
 public static LayoutNode BuildDashboard()
 {
-    var font = UI.Font("Segoe UI", 14f);
-    var whiteBrush = UI.Brush(Color.White);
-    
     var grid = UI.Grid()
         .Padding(10);
-    
-    // 3 строки, 2 колонки
+
     grid.RowDefinitions.Add(new RowDefinition(GridLength.Star(1)));
     grid.RowDefinitions.Add(new RowDefinition(GridLength.Star(1)));
     grid.RowDefinitions.Add(new RowDefinition(GridLength.Star(1)));
     grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star(1)));
     grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star(1)));
-    
-    // Заполнение карточками
+
     grid.Add(BuildCard("Продажи", "1,234", Color.Blue), 0, 0);
     grid.Add(BuildCard("Заказы", "567", Color.Green), 0, 1);
     grid.Add(BuildCard("Клиенты", "89", Color.Orange), 1, 0);
     grid.Add(BuildCard("Выручка", "$45,678", Color.Purple), 1, 1);
     grid.Add(BuildCard("Конверсия", "12.5%", Color.Red), 2, 0);
     grid.Add(BuildCard("Средний чек", "$89", Color.Teal), 2, 1);
-    
+
     return grid;
 }
 
@@ -773,8 +1069,8 @@ private static LayoutNode BuildCard(string title, string value, Color accentColo
 {
     var titleFont = UI.Font("Segoe UI", 12f);
     var valueFont = UI.Font("Segoe UI", 24f, bold: true);
-    var whiteBrush = UI.Brush(Color.White);
-    
+    var whiteBrush = UI.SolidBrush(Color.White);
+
     return UI.Overlay()
         .Add(UI.Background(accentColor))
         .Add(UI.Column(8)
@@ -784,26 +1080,37 @@ private static LayoutNode BuildCard(string title, string value, Color accentColo
 }
 ```
 
-### Пример 4: Реактивный счётчик
+### Пример 4: Список с Flex
+
+```csharp
+public static LayoutNode BuildListWithHeaderAndFooter()
+{
+    var font = UI.Font("Segoe UI", 14f);
+    var brush = UI.SolidBrush(Color.White);
+
+    return UI.Column(0)
+        .Add(UI.Label("Header", font, brush).Padding(12).BackgroundBrush(Color.Blue))
+        .Add(new StretchNode(0, 0).Flex(1))  // растягивается на всё свободное место
+        .Add(UI.Label("Footer", font, brush).Padding(12).BackgroundBrush(Color.Gray));
+}
+```
+
+### Пример 5: Реактивный счётчик
 
 ```csharp
 public static LayoutNode BuildCounter()
 {
     var counter = new Observable<int>(0);
+    var counterText = new ComputedObservable<string>(
+        () => counter.Value.ToString(),
+        counter);
+
     var font = UI.Font("Segoe UI", 48f, bold: true);
-    var whiteBrush = UI.Brush(Color.White);
-    
+    var whiteBrush = UI.SolidBrush(Color.White);
+
     var counterLabel = UI.Label("0", font, whiteBrush)
-        .BindText(new Observable<string>("0"));
-    
-    // Подписка на изменения счётчика
-    counter.Subscribe(value =>
-    {
-        // В реальном приложении здесь было бы обновление Observable<string>
-        // Для примера просто выводим в консоль
-        Console.WriteLine($"Counter: {value}");
-    });
-    
+        .BindText(counterText);
+
     return UI.Column(20)
         .Padding(40)
         .MainAlignment(MainAxisAlignment.Center)
@@ -811,20 +1118,20 @@ public static LayoutNode BuildCounter()
         .Add(UI.Row(20)
             .MainAlignment(MainAxisAlignment.Center)
             .Add(UI.Label("- decrement", UI.Font("Segoe UI", 16f), whiteBrush)
-                .FullBrush(Color.Red))
+                .BackgroundBrush(Color.Red))
             .Add(UI.Label("+ increment", UI.Font("Segoe UI", 16f), whiteBrush)
-                .FullBrush(Color.Green)));
+                .BackgroundBrush(Color.Green)));
 }
 ```
 
-### Пример 5: Галерея изображений
+### Пример 6: Галерея изображений
 
 ```csharp
 public static LayoutNode BuildImageGallery(string[] imagePaths)
 {
     var grid = UI.UniformGrid(rows: 3, columns: 3, spacing: 8)
         .Padding(10);
-    
+
     foreach (var path in imagePaths.Take(9))
     {
         grid.Add(UI.ClipRoundedRect(8f)
@@ -832,13 +1139,58 @@ public static LayoutNode BuildImageGallery(string[] imagePaths)
                 .SetSize(150, 150)
                 .SizeMode(ImageSizeMode.Stretch)));
     }
-    
+
     return grid;
+}
+```
+
+### Пример 7: Условный рендеринг
+
+```csharp
+public static LayoutNode BuildConditionalView()
+{
+    var isLoggedIn = new Observable<bool>(false);
+    var font = UI.Font("Segoe UI", 14f);
+    var whiteBrush = UI.SolidBrush(Color.White);
+    var grayBrush = UI.SolidBrush(Color.Gray);
+
+    return UI.Column(12)
+        .Padding(20)
+        .Add(UI.When(
+            isLoggedIn,
+            trueNode: UI.Label("Welcome back!", font, whiteBrush),
+            falseNode: UI.Label("Please log in", font, grayBrush)));
+}
+```
+
+### Пример 8: Панель тегов с WrapPanel
+
+```csharp
+public static LayoutNode BuildTagPanel(string[] tags)
+{
+    var font = UI.Font("Segoe UI", 12f);
+    var whiteBrush = UI.SolidBrush(Color.White);
+
+    var panel = UI.WrapPanel(
+        direction: WrapDirection.Horizontal,
+        spacing: 8,
+        lineSpacing: 8)
+        .Padding(12);
+
+    foreach (var tag in tags)
+    {
+        panel.Add(UI.Label(tag, font, whiteBrush)
+            .BackgroundBrush(Color.FromArgb(60, 60, 60))
+            .Padding(8, 4));
+    }
+
+    return panel;
 }
 ```
 
 ---
 
+<a id="best-practices"></a>
 ## Best practices
 
 ### 1. Инициализация UI.*
@@ -873,13 +1225,13 @@ font.Dispose();  // адаптер может использовать уже о
 
 ```csharp
 // ✅ ПРАВИЛЬНО: автоматический Dispose через DisplayRoot
-var displayRoot = new DisplayRoot(new RenderRootFactory(parent, timers));
+var displayRoot = new DisplayRoot(new RenderRootFactory(parent));
 displayRoot.Build(rootNode, location, size);
 // ... использование ...
-displayRoot.Dispose();  // освободит все компоненты
+displayRoot.Dispose();
 
 // ✅ ПРАВИЛЬНО: ручной Dispose дерева
-rootNode.Dispose();  // освободит все компоненты в дереве
+rootNode.Dispose();
 
 // ❌ НЕПРАВИЛЬНО: забытый Dispose
 var displayRoot = new DisplayRoot(factory);
@@ -892,8 +1244,7 @@ displayRoot.Build(rootNode, location, size);
 ```csharp
 // ✅ ПРАВИЛЬНО: привязка через fluent API (автоматическая отписка)
 var observable = new Observable<string>("value");
-var label = UI.Label("text", font, brush)
-    .BindText(observable);
+var label = UI.Label("text", font, brush).BindText(observable);
 // при Dispose label автоматически отпишется
 
 // ❌ НЕПРАВИЛЬНО: ручная подписка без отписки
@@ -931,67 +1282,57 @@ var column = UI.Column(0)
     .Add(UI.Label("B", font, brush));
 ```
 
-### 7. Выравнивание в контейнерах
+### 7. Использование Flex для пропорциональных размеров
 
 ```csharp
-// ✅ ПРАВИЛЬНО: выравнивание через свойства узла
+// ✅ ПРАВИЛЬНО: flex для растягивания
+var column = UI.Column(8)
+    .Add(UI.Label("Header", font, brush).Flex(0))
+    .Add(UI.Label("Content", font, brush).Flex(1))   // забирает остаток
+    .Add(UI.Label("Footer", font, brush).Flex(0));
+
+// ❌ НЕПРАВИЛЬНО: ручной расчёт размеров
+var column = UI.Column(8)
+    .Add(UI.Label("Header", font, brush))
+    .Add(UI.Label("Content", font, brush).SetSize(800, 400))  // хардкод
+    .Add(UI.Label("Footer", font, brush));
+```
+
+### 8. Использование StretchNode вместо FixedNode с Flex
+
+```csharp
+// ✅ ПРАВИЛЬНО: StretchNode растягивается сам
+var column = UI.Column(0)
+    .Add(UI.Label("Top", font, brush))
+    .Add(new StretchNode(0, 0).Flex(1))
+    .Add(UI.Label("Bottom", font, brush));
+
+// ❌ НЕПРАВИЛЬНО: FixedNode не растягивается
+var column = UI.Column(0)
+    .Add(UI.Label("Top", font, brush))
+    .Add(UI.Fixed(0, 0).Flex(1))  // FixedNode игнорирует Flex
+    .Add(UI.Label("Bottom", font, brush));
+```
+
+### 9. Избегание хардкода размеров
+
+```csharp
+// ✅ ПРАВИЛЬНО: Min/Max ограничения вместо фиксированного размера
 var label = UI.Label("Text", font, brush)
-    .HAlignment(Alignment.Center)
-    .VAlignment(Alignment.Center);
+    .MinWidth(100)
+    .MaxWidth(400);
 
-// ✅ ПРАВИЛЬНО: MainAxisAlignment для распределения в стеке
-var stack = UI.Column(8)
-    .MainAlignment(MainAxisAlignment.SpaceBetween)
-    .Add(child1)
-    .Add(child2);
-
-// ❌ НЕПРАВИЛЬНО: ручное вычисление позиций
-var stack = UI.Column(0)
-    .Add(child1.Margin(0, 50, 0, 0))  // хардкод отступов
-    .Add(child2);
-```
-
-### 8. Маски и производительность
-
-```csharp
-// ✅ ПРАВИЛЬНО: маска создаётся один раз
-var clip = UI.ClipCircle()
-    .Add(UI.Image(UI.ImageFromFile("avatar.png")));
-
-// ❌ НЕПРАВИЛЬНО: пересоздание маски на каждый кадр
-// (в реальном приложении это происходит автоматически, но избегайте
-// создания новых ClipNode в цикле Measure/Arrange)
-```
-
-### 9. Обработка ошибок компиляции (в Playground)
-
-```csharp
-// ✅ ПРАВИЛЬНО: проверка результата компиляции
-var result = _vm.Run(code);
-if (!result.Success)
-{
-    // показать ошибки пользователю
-    ShowErrors(result.ErrorOutput);
-    return;
-}
-// использовать result.Root
-
-// ❌ НЕПРАВИЛЬНО: игнорирование ошибок
-var result = _vm.Run(code);
-var root = result.Root;  // может быть null!
+// ❌ НЕПРАВИЛЬНО: фиксированный размер
+var label = UI.Label("Text", font, brush).SetSize(400, 50);
 ```
 
 ### 10. Потокобезопасность
 
 ```csharp
 // ✅ ПРАВИЛЬНО: изменение Observable в UI-потоке
-Dispatcher.Invoke(() =>
-{
-    counter.Value++;
-});
+Dispatcher.Invoke(() => counter.Value++);
 
-// ✅ ПРАВИЛЬНО: Observable потокобезопасен (использует lock)
-var counter = new Observable<int>(0);
+// ✅ ПРАВИЛЬНО: Observable потокобезопасен
 Task.Run(() => counter.Value = 10);  // безопасно
 
 // ❌ НЕПРАВИЛЬНО: изменение UI-компонентов из фонового потока
@@ -1001,8 +1342,19 @@ Task.Run(() =>
 });
 ```
 
----
+### 11. Использование ComputedObservable вместо ручных подписок
 
-## Лицензия
+```csharp
+// ✅ ПРАВИЛЬНО: ComputedObservable сам управляет подписками
+var a = new Observable<int>(1);
+var b = new Observable<int>(2);
+var sum = new ComputedObservable<int>(() => a.Value + b.Value, a, b);
 
-Copyright © 2026 AES
+// ❌ НЕПРАВИЛЬНО: ручное управление
+var a = new Observable<int>(1);
+var b = new Observable<int>(2);
+var sum = new Observable<int>(3);
+a.Subscribe(_ => sum.Value = a.Value + b.Value);
+b.Subscribe(_ => sum.Value = a.Value + b.Value);
+// при Dispose каждой подписки легко забыть отписку
+```
