@@ -1,4 +1,22 @@
-﻿using System;
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+using System;
 
 using DisplayNodes.Core;
 using DisplayNodes.Core.Rendering;
@@ -43,7 +61,7 @@ namespace DisplayNodes.Widgets
 		}
 
 		/// <summary>Привязывает кисть текста к <see cref="Observable{T}"/>.</summary>
-		public LabelNode BindBrush(Observable<IBrush> observable)
+		public LabelNode BindForegroundBrush(Observable<IBrush> observable)
 		{
 			if (observable == null)
 				throw new ArgumentNullException(nameof(observable));
@@ -53,7 +71,7 @@ namespace DisplayNodes.Widgets
 		}
 
 		/// <summary>Привязывает кисть фона к <see cref="Observable{T}"/>.</summary>
-		public LabelNode BindFullBrush(Observable<IBrush> observable)
+		public LabelNode BindBackgroundBrush(Observable<IBrush> observable)
 		{
 			if (observable == null)
 				throw new ArgumentNullException(nameof(observable));

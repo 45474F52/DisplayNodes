@@ -1,4 +1,22 @@
-﻿namespace DisplayNodes.Playground
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+namespace DisplayNodes.Playground
 {
 	partial class AppForm
 	{
@@ -35,6 +53,7 @@
             this.BtnLoad = new System.Windows.Forms.ToolStripMenuItem();
             this.BtnSave = new System.Windows.Forms.ToolStripMenuItem();
             this.BtnRecent = new System.Windows.Forms.ToolStripMenuItem();
+            this.BtnExportPreview = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.BtnExit = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
@@ -48,7 +67,7 @@
             this.lblCompilerMode = new System.Windows.Forms.ToolStripStatusLabel();
             this.mainSplitter = new System.Windows.Forms.SplitContainer();
             this.viewLogsSplitter = new System.Windows.Forms.SplitContainer();
-            this.picPreview = new System.Windows.Forms.PictureBox();
+            this.previewHost = new System.Windows.Forms.Panel();
             this.errorContextMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.errorCopy = new System.Windows.Forms.ToolStripMenuItem();
             this.errorCopyAll = new System.Windows.Forms.ToolStripMenuItem();
@@ -62,7 +81,7 @@
             this.viewLogsSplitter.Panel1.SuspendLayout();
             this.viewLogsSplitter.Panel2.SuspendLayout();
             this.viewLogsSplitter.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.picPreview)).BeginInit();
+            this.previewHost.SuspendLayout();
             this.errorContextMenu.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -92,6 +111,7 @@
             this.BtnLoad,
             this.BtnSave,
             this.BtnRecent,
+            this.BtnExportPreview,
             this.toolStripSeparator2,
             this.BtnExit});
             this.BtnFile.ImageTransparentColor = System.Drawing.Color.Magenta;
@@ -126,6 +146,16 @@
             this.BtnRecent.Name = "BtnRecent";
             this.BtnRecent.Size = new System.Drawing.Size(179, 22);
             this.BtnRecent.Text = "Недавние";
+            //
+            // BtnExportPreview
+            //
+            this.BtnExportPreview.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.BtnExportPreview.Name = "BtnExportPreview";
+            this.BtnExportPreview.ShortcutKeyDisplayString = "Ctrl + E";
+            this.BtnExportPreview.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.E)));
+            this.BtnExportPreview.Size = new System.Drawing.Size(179, 22);
+            this.BtnExportPreview.Text = "Экспорт изображения";
+            this.BtnExportPreview.Click += new System.EventHandler(this.BtnExportPreview_Click);
             // 
             // toolStripSeparator2
             // 
@@ -244,7 +274,7 @@
             // 
             // viewLogsSplitter.Panel1
             // 
-            this.viewLogsSplitter.Panel1.Controls.Add(this.picPreview);
+            this.viewLogsSplitter.Panel1.Controls.Add(this.previewHost);
             // 
             // viewLogsSplitter.Panel2
             // 
@@ -254,17 +284,16 @@
             this.viewLogsSplitter.SplitterWidth = 3;
             this.viewLogsSplitter.TabIndex = 0;
             // 
-            // picPreview
+            // previewHost
             // 
-            this.picPreview.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(45)))), ((int)(((byte)(45)))), ((int)(((byte)(48)))));
-            this.picPreview.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.picPreview.Location = new System.Drawing.Point(0, 0);
-            this.picPreview.Margin = new System.Windows.Forms.Padding(2);
-            this.picPreview.Name = "picPreview";
-            this.picPreview.Size = new System.Drawing.Size(448, 435);
-            this.picPreview.SizeMode = System.Windows.Forms.PictureBoxSizeMode.CenterImage;
-            this.picPreview.TabIndex = 0;
-            this.picPreview.TabStop = false;
+            this.previewHost.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(45)))), ((int)(((byte)(45)))), ((int)(((byte)(48)))));
+            this.previewHost.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.previewHost.Location = new System.Drawing.Point(0, 0);
+            this.previewHost.Margin = new System.Windows.Forms.Padding(2);
+            this.previewHost.Name = "previewHost";
+            this.previewHost.Size = new System.Drawing.Size(448, 435);
+            this.previewHost.TabIndex = 0;
+            this.previewHost.TabStop = false;
             // 
             // errorContextMenu
             // 
@@ -343,11 +372,10 @@
             this.viewLogsSplitter.Panel1.ResumeLayout(false);
             this.viewLogsSplitter.Panel2.ResumeLayout(false);
             this.viewLogsSplitter.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.picPreview)).EndInit();
+            this.previewHost.ResumeLayout(false);
             this.errorContextMenu.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
-
 		}
 
 		#endregion
@@ -357,8 +385,8 @@
 		private System.Windows.Forms.SplitContainer mainSplitter;
 		private System.Windows.Forms.SplitContainer viewLogsSplitter;
 		private DisplayNodes.Playground.Editor.CodeEditor codeEditor;
-		private System.Windows.Forms.PictureBox picPreview;
-		private DisplayNodes.Playground.Editor.SafeListBox lstErrors;
+        private System.Windows.Forms.Panel previewHost;
+        private DisplayNodes.Playground.Editor.SafeListBox lstErrors;
 		private System.Windows.Forms.ToolStripButton btnRun;
 		private System.Windows.Forms.ToolStripButton btnClear;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
@@ -370,7 +398,8 @@
 		private System.Windows.Forms.ToolStripMenuItem BtnLoad;
 		private System.Windows.Forms.ToolStripMenuItem BtnSave;
 		private System.Windows.Forms.ToolStripMenuItem BtnRecent;
-		private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
+        private System.Windows.Forms.ToolStripMenuItem BtnExportPreview;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
 		private System.Windows.Forms.ToolStripMenuItem BtnExit;
 		private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
 		private System.Windows.Forms.ContextMenuStrip errorContextMenu;

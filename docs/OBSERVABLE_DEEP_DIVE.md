@@ -1,31 +1,60 @@
 # Руководство по `Observable<T>`
 
-Глубокое руководство по реактивной системе `Observable<T>` в DisplayNodes. Документ описывает внутреннее устройство, потокобезопасность, паттерны использования, типичные ошибки и интеграцию с виджетами.
+Глубокое руководство по реактивной системе DisplayNodes. Документ описывает внутреннее устройство, потокобезопасность, паттерны использования, типичные ошибки и интеграцию с виджетами.
 
+## Содержание
+
+1. [Обзор](#overview)
+2. [Observable\<T\>](#observable)
+3. [IObservableSource](#source)
+4. [ComputedObservable\<T\>](#computed)
+5. [ObservableList\<T\>](#list)
+6. [ConditionalNode](#conditional)
+7. [Потокобезопасность](#threading)
+8. [Обработка исключений](#exceptions)
+9. [Привязка к виджетам](#bindings)
+10. [Автоматическая отписка](#auto-unsubscribe)
+11. [Типичные паттерны](#patterns)
+12. [Типичные ошибки](#mistakes)
+13. [Производительность](#performance)
+14. [Тестирование](#testing)
+
+---
+
+<a id="overview"></a>
 ## Обзор
 
-`Observable<T>` — реактивное свойство, уведомляющее подписчиков об изменении значения. Используется для привязки данных к виджетам: при изменении `Value` все подписанные виджеты автоматически обновляются.
+Реактивная система DisplayNodes состоит из трёх уровней:
+
+| Компонент | Назначение |
+|---|---|
+| `Observable<T>` | Реактивное свойство с уведомлением подписчиков |
+| `IObservableSource` | Не-generic интерфейс для унификации `Observable<T>` с разными `T` |
+| `ComputedObservable<T>` | Вычисляемое свойство на основе других источников |
+| `ObservableList<T>` | Реактивная коллекция с событиями изменений |
 
 ```csharp
 var counter = new Observable<int>(0);
-var label = UI.Label("0", font, brush)
-    .BindText(new Observable<string>("0"));
+var label = UI.Label("0", font, brush).BindText(
+    new ComputedObservable<string>(() => counter.Value.ToString(), counter));
 
-counter.Subscribe(v => Console.WriteLine($"Counter: {v}"));
-counter.Value = 10;  // выведет "Counter: 10"
+counter.Value = 10;  // UI обновится автоматически
 ```
 
-## Устройство класса
+---
 
-### Поля и состояние
+<a id="observable"></a>
+## Observable\<T\>
+
+### Устройство класса
 
 ```csharp
-public class Observable<T>
+public class Observable<T> : IObservableSource
 {
     private readonly object _lock = new object();
     private readonly List<Action<T>> _subscribers = new List<Action<T>>();
     private T _value;
-    
+
     public Observable(T initialValue)
     {
         _value = initialValue;
@@ -108,13 +137,13 @@ private class Subscription : IDisposable
 {
     private Observable<T> _observable;
     private Action<T> _callback;
-    
+
     public Subscription(Observable<T> observable, Action<T> callback)
     {
         _observable = observable;
         _callback = callback;
     }
-    
+
     public void Dispose()
     {
         if (_observable != null && _callback != null)
@@ -132,6 +161,387 @@ private class Subscription : IDisposable
 - `Unsubscribe` — внутренний метод, вызывается только через `Subscription.Dispose`.
 - После `Dispose` ссылки на `_observable` и `_callback` обнуляются, чтобы избежать утечек памяти.
 
+---
+
+<a id="source"></a>
+## IObservableSource
+
+`IObservableSource` — не-generic интерфейс для подписки на `Observable<T>` с разными `T`.
+
+```csharp
+public interface IObservableSource
+{
+    IDisposable Subscribe(Action<object> callback);
+}
+```
+
+`Observable<T>` реализует `IObservableSource` явно:
+
+```csharp
+IDisposable IObservableSource.Subscribe(Action<object> callback)
+{
+    if (callback == null)
+        throw new ArgumentNullException(nameof(callback));
+
+    return Subscribe(v => callback(v));
+}
+```
+
+### Зачем нужен
+
+Из-за **инвариантности generic'ов** в C# нельзя передать `Observable<int>`, `Observable<string>` и `Observable<bool>` в один `params Observable<object>[]`:
+
+```csharp
+// Не компилируется: Observable<int> не является Observable<object>
+var intObs = new Observable<int>(0);
+Observable<object> objObs = intObs;  // ошибка компиляции
+```
+
+Через `IObservableSource` это возможно:
+
+```csharp
+var intObs = new Observable<int>(0);
+var strObs = new Observable<string>("");
+var boolObs = new Observable<bool>(true);
+
+IObservableSource[] sources = { intObs, strObs, boolObs };  // OK
+```
+
+### Boxing
+
+Для value-type это упаковка при уведомлении. Для ссылочных типов — без оверхеда.
+
+**Пример:**
+
+```csharp
+var intObs = new Observable<int>(0);
+IObservableSource source = intObs;
+
+source.Subscribe(obj => Console.WriteLine((int)obj));  // boxing при уведомлении
+```
+
+---
+
+<a id="computed"></a>
+## ComputedObservable\<T\>
+
+`ComputedObservable<T>` — реактивное свойство, значение которого вычисляется из других источников.
+
+```csharp
+public class ComputedObservable<T> : Observable<T>, IDisposable
+{
+    private readonly object _lock = new object();
+    private readonly Func<T> _compute;
+    private readonly List<IDisposable> _subscriptions = new List<IDisposable>();
+
+    private bool _disposed;
+
+    public ComputedObservable(Func<T> compute, params IObservableSource[] dependencies)
+        : base(ComputeInitial(compute))
+    {
+        _compute = compute;
+
+        if (dependencies != null)
+        {
+            foreach (IObservableSource source in dependencies)
+            {
+                if (source == null)
+                    continue;
+
+                _subscriptions.Add(source.Subscribe(OnDependencyChanged));
+            }
+        }
+    }
+}
+```
+
+### Поведение
+
+1. **При создании** значение вычисляется один раз (`ComputeInitial`).
+2. **При изменении любой зависимости** вызывается `compute()`.
+3. **Если новое значение отличается** от текущего — уведомляются подписчики (через `Value = newValue` в базовом `Observable<T>`).
+4. **При `Dispose`** отписывается от всех зависимостей.
+
+### Пример
+
+```csharp
+var firstName = new Observable<string>("Ivan");
+var lastName = new Observable<string>("Petrov");
+
+var fullName = new ComputedObservable<string>(
+    () => firstName.Value + " " + lastName.Value,
+    firstName,
+    lastName);
+
+// fullName.Value == "Ivan Petrov"
+firstName.Value = "Petr";
+// fullName.Value == "Petr Petrov" (автоматически)
+```
+
+### Chained computed
+
+```csharp
+var a = new Observable<int>(1);
+var doubled = new ComputedObservable<int>(() => a.Value * 2, a);
+var quadrupled = new ComputedObservable<int>(() => doubled.Value * 2, doubled);
+
+// quadrupled.Value == 4
+a.Value = 5;
+// quadrupled.Value == 20
+```
+
+### С разнотипными зависимостями
+
+```csharp
+var num = new Observable<int>(10);
+var text = new Observable<string>("Hello");
+
+var result = new ComputedObservable<string>(
+    () => text.Value + ": " + num.Value,
+    num, text);  // IObservableSource[] — работает
+
+// result.Value == "Hello: 10"
+num.Value = 20;
+// result.Value == "Hello: 20"
+```
+
+### Refresh
+
+Метод `Refresh()` позволяет вручную пересчитать значение, если зависимости изменились в обход `Observable<T>.Value`:
+
+```csharp
+int external = 1;
+var computed = new ComputedObservable<int>(() => external);
+
+// computed.Value == 1
+external = 42;
+computed.Refresh();
+// computed.Value == 42
+```
+
+### Обработка исключений в compute
+
+Если `compute()` бросает исключение, оно перехватывается, старое значение остаётся, подписчики не уведомляются:
+
+```csharp
+var computed = new ComputedObservable<int>(() => 
+{
+    if (someCondition) throw new InvalidOperationException();
+    return 42;
+}, someObservable);
+```
+
+### Ограничения
+
+- **Циклические зависимости** не отслеживаются — если `ComputedObservable` зависит от себя же, будет бесконечная рекурсия. Это ответственность пользователя.
+- **Batch-обновления** не реализованы — при изменении нескольких зависимостей в одном тике `compute()` вызывается несколько раз (см. ROADMAP).
+
+### Dispose
+
+```csharp
+public void Dispose()
+{
+    lock (_lock)
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+
+        foreach (IDisposable sub in _subscriptions)
+        {
+            try { sub?.Dispose(); }
+            catch { }
+        }
+        _subscriptions.Clear();
+    }
+}
+```
+
+После `Dispose` `OnDependencyChanged` ничего не делает.
+
+---
+
+<a id="list"></a>
+## ObservableList\<T\>
+
+`ObservableList<T>` — реактивная коллекция, реализующая `IList<T>`.
+
+```csharp
+public class ObservableList<T> : IList<T>, IDisposable
+{
+    private readonly object _lock = new object();
+    private readonly List<T> _items;
+    private bool _disposed;
+
+    public event Action<ListChange<T>> Changed;
+
+    // IList<T>
+    public int Count { get; }
+    public bool IsReadOnly => false;
+    public T this[int index] { get; set; }
+
+    public void Add(T item);
+    public void Insert(int index, T item);
+    public bool Remove(T item);
+    public void RemoveAt(int index);
+    public void Clear();
+
+    public bool Contains(T item);
+    public int IndexOf(T item);
+    public void CopyTo(T[] array, int arrayIndex);
+    public IEnumerator<T> GetEnumerator();
+
+    // Дополнительно
+    public void Move(int oldIndex, int newIndex);
+    public List<T> ToList();
+}
+```
+
+### ListChangeType
+
+```csharp
+public enum ListChangeType
+{
+    Add,      // элемент добавлен в конец
+    Insert,   // элемент вставлен по индексу
+    Remove,   // элемент удалён по индексу
+    Replace,  // элемент заменён по индексу
+    Move,     // элемент перемещён
+    Reset     // коллекция очищена
+}
+```
+
+### ListChange\<T\>
+
+```csharp
+public readonly struct ListChange<T>
+{
+    public readonly ListChangeType Type;
+    public readonly int OldIndex;  // -1, если не применимо
+    public readonly int NewIndex;  // -1, если не применимо
+    public readonly T Item;
+}
+```
+
+**Соглашения:**
+
+| Type | OldIndex | NewIndex | Item |
+|---|---|---|---|
+| `Add` | -1 | индекс | добавленный |
+| `Insert` | -1 | индекс | вставленный |
+| `Remove` | индекс | -1 | удалённый |
+| `Replace` | индекс | индекс | новый |
+| `Move` | откуда | куда | перемещённый |
+| `Reset` | -1 | -1 | default |
+
+### Использование
+
+```csharp
+var list = new ObservableList<string>();
+
+list.Changed += change =>
+{
+    Console.WriteLine($"{change.Type} at {change.NewIndex}: {change.Item}");
+};
+
+list.Add("Item 1");          // Add at 0: Item 1
+list.Add("Item 2");          // Add at 1: Item 2
+list.Insert(1, "Inserted");  // Insert at 1: Inserted
+list.RemoveAt(0);            // Remove at 0: Item 1
+list[0] = "Replaced";        // Replace at 0: Replaced
+list.Move(0, 1);             // Move [0→1]: Replaced
+list.Clear();                // Reset
+```
+
+### Потокобезопасность
+
+- Все операции защищены `lock`.
+- Событие `Changed` вызывается **вне lock** — подписчик может безопасно изменять коллекцию из обработчика.
+- Все подписчики вызываются **отдельно** через `GetInvocationList()` — исключение в одном не ломает цепочку.
+
+**Реализация RaiseChanged:**
+
+```csharp
+private void RaiseChanged(ListChange<T> change)
+{
+    Action<ListChange<T>> handler = Changed;
+    if (handler == null)
+        return;
+
+    Delegate[] invocationList = handler.GetInvocationList();
+
+    for (int i = 0; i < invocationList.Length; i++)
+    {
+        try
+        {
+            ((Action<ListChange<T>>)invocationList[i])(change);
+        }
+        catch { }
+    }
+}
+```
+
+**Почему через `GetInvocationList`:** multicast delegate вызывает подписчиков последовательно внутри одного вызова. Если один бросает исключение — остальные не вызываются. `GetInvocationList` разбивает delegate на отдельные делегаты, каждый в своём `try/catch`.
+
+### Итерация
+
+- `GetEnumerator` возвращает enumerator `List<T>` — `foreach` бросает `InvalidOperationException` при модификации, как в стандартном `List<T>`.
+- `ToList()` возвращает безопасный снимок — можно модифицировать коллекцию во время перебора.
+
+```csharp
+// Бросает InvalidOperationException при модификации
+foreach (var item in list) { list.Add(...); }  // ошибка
+
+// Безопасно
+foreach (var item in list.ToList()) { list.Add(...); }  // OK
+```
+
+### Dispose
+
+После `Dispose` любая операция (кроме повторного `Dispose`) бросает `ObjectDisposedException`:
+
+```csharp
+var list = new ObservableList<int>();
+list.Dispose();
+
+list.Add(1);  // ObjectDisposedException
+int c = list.Count;  // ObjectDisposedException
+foreach (var x in list) { }  // ObjectDisposedException
+```
+
+### UI-интеграция
+
+`RepeaterNode` — контейнер, подписанный на `ObservableList<T>`, автоматически создающий/удаляющий дочерние `LayoutNode` при изменениях — **отложен** до реализации hot-swap поддеревьев (см. ROADMAP).
+
+---
+
+<a id="conditional"></a>
+## ConditionalNode
+
+`ConditionalNode` — контейнер, отображающий одно из двух поддеревьев по `Observable<bool>`. Реализует `IDisposable` — при `Dispose` отписывается от `Observable<bool>`.
+
+```csharp
+var isLoggedIn = new Observable<bool>(false);
+
+var conditional = UI.When(
+    isLoggedIn,
+    trueNode: UI.Label("Welcome!", font, greenBrush),
+    falseNode: UI.Label("Please log in", font, grayBrush));
+
+// Подписка на переключение
+conditional.OnChanged(value =>
+{
+    Console.WriteLine($"Condition changed to: {value}");
+});
+```
+
+**Ограничение:** `ConditionalNode` **не пересчитывает layout автоматически** при переключении. Пользователь должен вызвать `Measure`+`Arrange`+`Refresh` вручную или перестроить дерево целиком.
+
+Внутренне `ConditionalNode` хранит `Observable<bool>` и подписывается на него через `Subscribe`. При изменении вызывается `OnConditionChanged`, который уведомляет `ConditionChanged` (внутреннее событие). Fluent-метод `.OnChanged(...)` подписывается на это событие.
+
+---
+
+<a id="threading"></a>
 ## Потокобезопасность
 
 ### Чтение и запись
@@ -142,16 +552,10 @@ private class Subscription : IDisposable
 var counter = new Observable<int>(0);
 
 // Чтение из фонового потока — безопасно
-Task.Run(() =>
-{
-    int value = counter.Value;  // защищено lock
-});
+Task.Run(() => { int value = counter.Value; });
 
 // Запись из фонового потока — безопасно
-Task.Run(() =>
-{
-    counter.Value = 10;  // защищено lock
-});
+Task.Run(() => counter.Value = 10);
 ```
 
 ### Уведомления подписчиков
@@ -175,18 +579,22 @@ counter.Value = 10;
 Task.Run(() => counter.Value = 20);
 ```
 
-**Важно:** если подписчик обновляет UI, он должен использовать `Dispatcher.Invoke` или аналогичный механизм для переключения в UI-поток.
+**Важно:** если подписчик обновляет UI, он должен использовать `Dispatcher.Invoke`:
+
+```csharp
+counter.Subscribe(v =>
+{
+    Dispatcher.Invoke(() => label.Component.Text = v.ToString());
+});
+```
 
 ### Подписки и отписки
 
 Операции `Subscribe` и `Unsubscribe` защищены `lock` — потокобезопасны:
 
 ```csharp
-// Подписка из фонового потока — безопасно
 var subscription = counter.Subscribe(v => Console.WriteLine(v));
-
-// Отписка из другого потока — безопасно
-Task.Run(() => subscription.Dispose());
+Task.Run(() => subscription.Dispose());  // безопасно
 ```
 
 ### Копирование списка подписчиков
@@ -204,6 +612,9 @@ counter.Subscribe(v =>
 });
 ```
 
+---
+
+<a id="exceptions"></a>
 ## Обработка исключений
 
 Исключения в подписчиках перехватываются и игнорируются:
@@ -240,6 +651,9 @@ observable.Subscribe(v =>
 });
 ```
 
+---
+
+<a id="bindings"></a>
 ## Привязка к виджетам
 
 Виджеты предоставляют методы `Bind*` для привязки свойств к `Observable<T>`.
@@ -263,25 +677,18 @@ public LabelNode BindText(Observable<string> observable)
 {
     if (observable == null)
         throw new ArgumentNullException(nameof(observable));
-    
+
     // Устанавливаем начальное значение
     Component.Text = observable.Value ?? string.Empty;
-    
+
     // Подписываемся на изменения
     _ = AddSubscription(observable.Subscribe(v => Component.Text = v ?? string.Empty));
-    
+
     return this;
 }
 ```
 
-**Особенности:**
-- Начальное значение устанавливается сразу.
-- Подписка регистрируется через `AddSubscription` — автоматически отписывается при `Dispose` виджета.
-- Подписчик обновляет свойство компонента.
-
 ### Привязка нескольких свойств
-
-Виджет может иметь несколько привязок:
 
 ```csharp
 var textObservable = new Observable<string>("Text");
@@ -291,9 +698,8 @@ var brushObservable = new Observable<IBrush>(brush);
 var label = UI.Label("Text", font, brush)
     .BindText(textObservable)
     .BindFont(fontObservable)
-    .BindBrush(brushObservable);
+    .BindForegroundBrush(brushObservable);
 
-// Все свойства обновятся автоматически
 textObservable.Value = "New text";
 fontObservable.Value = newFont;
 brushObservable.Value = newBrush;
@@ -307,24 +713,8 @@ var isVisible = new Observable<bool>(true);
 var label = UI.Label("Text", font, brush)
     .BindVisible(isVisible);
 
-isVisible.Value = false;  // метка скроется
-isVisible.Value = true;   // метка появится
-```
-
-**Реализация:**
-
-```csharp
-public static T BindVisible<T>(this T node, Observable<bool> source)
-    where T : WidgetNode
-{
-    if (source == null)
-        throw new ArgumentNullException(nameof(source));
-    
-    node.Component.Visible = source.Value;
-    _ = node.AddSubscription(source.Subscribe(v => node.Component.Visible = v));
-    
-    return node;
-}
+isVisible.Value = false;
+isVisible.Value = true;
 ```
 
 ### Привязка эффектов
@@ -338,10 +728,6 @@ var image = UI.Image(UI.ImageFromFile("photo.jpg"))
     .BindOpacity(opacity)
     .BindBrightness(brightness)
     .BindContrast(contrast);
-
-opacity.Value = 50.0;      // прозрачность 50%
-brightness.Value = 20.0;   // яркость +20
-contrast.Value = -10.0;    // контраст -10
 ```
 
 ### Привязка изображения
@@ -352,20 +738,43 @@ var imageObservable = new Observable<IImage>(UI.ImageFromFile("default.png"));
 var imageNode = UI.Image()
     .BindBitmap(imageObservable);
 
-imageObservable.Value = UI.ImageFromFile("new.png");  // изображение обновится
+imageObservable.Value = UI.ImageFromFile("new.png");
 ```
 
-### Привязка режима отображения
+### Привязка фона
 
 ```csharp
-var sizeModeObservable = new Observable<ImageSizeMode>(ImageSizeMode.Normal);
+var bgObservable = new Observable<IBrush>(UI.SolidBrush(Color.Black));
 
-var imageNode = UI.Image(UI.ImageFromFile("icon.png"))
-    .BindSizeMode(sizeModeObservable);
-
-sizeModeObservable.Value = ImageSizeMode.Stretch;  // режим изменится
+var label = UI.Label("Text", font, brush)
+    .BindBackgroundBrush(bgObservable);
 ```
 
+### Таблица методов привязки
+
+| Свойство | Метод привязки |
+|---|---|
+| `ILabelComponent.Text` | `BindText` |
+| `ILabelComponent.Font` | `BindFont` |
+| `ILabelComponent.ForegroundBrush` | `BindForegroundBrush` |
+| `ILabelComponent.BackgroundBrush` | `BindBackgroundBrush` |
+| `ILabelComponent.Format` | `BindFormat` |
+| `ITextLayoutComponent.DrawMethod` | `BindDrawMethod` |
+| `ITextLayoutComponent.Stretch` | `BindStretch` |
+| `IImageComponent.Image` | `BindBitmap` |
+| `IImageComponent.SizeMode` | `BindSizeMode` |
+| `IRenderComponent.Visible` | `BindVisible` |
+| `IEffectComponent.Opacity` | `BindOpacity` |
+| `IEffectComponent.Brightness` | `BindBrightness` |
+| `IEffectComponent.Contrast` | `BindContrast` |
+
+**История переименований:**
+- `BindBrush` → `BindForegroundBrush`.
+- `BindFullBrush` → `BindBackgroundBrush`.
+
+---
+
+<a id="auto-unsubscribe"></a>
 ## Автоматическая отписка
 
 Виджеты автоматически отписываются от всех `Observable` при `Dispose`.
@@ -376,7 +785,7 @@ sizeModeObservable.Value = ImageSizeMode.Stretch;  // режим изменит�
 public abstract class WidgetNode : LayoutNode, IDisposable
 {
     private readonly IList<IDisposable> _subscriptions = new List<IDisposable>();
-    
+
     public IDisposable AddSubscription(IDisposable subscription)
     {
         if (subscription != null)
@@ -386,7 +795,7 @@ public abstract class WidgetNode : LayoutNode, IDisposable
         }
         return subscription;
     }
-    
+
     public void Dispose()
     {
         lock (_subscriptions)
@@ -419,6 +828,9 @@ label.Dispose();  // автоматически отписывается от ob
 observable.Value = "Updated";  // label не обновится — подписка отписана
 ```
 
+---
+
+<a id="patterns"></a>
 ## Типичные паттерны
 
 ### Паттерн 1: Простая привязка
@@ -427,12 +839,9 @@ observable.Value = "Updated";  // label не обновится — подпис
 var counter = new Observable<int>(0);
 
 var label = UI.Label("0", font, brush)
-    .BindText(new Observable<string>("0"));
-
-counter.Subscribe(v =>
-{
-    // Обновить Observable<string> для label
-});
+    .BindText(new ComputedObservable<string>(
+        () => counter.Value.ToString(),
+        counter));
 ```
 
 ### Паттерн 2: Множественные привязки
@@ -445,7 +854,7 @@ var brush = new Observable<IBrush>(defaultBrush);
 var label = UI.Label("Text", font.Value, brush.Value)
     .BindText(text)
     .BindFont(font)
-    .BindBrush(brush);
+    .BindForegroundBrush(brush);
 ```
 
 ### Паттерн 3: Условная видимость
@@ -456,7 +865,6 @@ var isVisible = new Observable<bool>(true);
 var label = UI.Label("Text", font, brush)
     .BindVisible(isVisible);
 
-// Переключение видимости
 isVisible.Value = !isVisible.Value;
 ```
 
@@ -464,14 +872,14 @@ isVisible.Value = !isVisible.Value;
 
 ```csharp
 var counter = new Observable<int>(0);
-var counterText = new Observable<string>("0");
-
-counter.Subscribe(v => counterText.Value = v.ToString());
+var counterText = new ComputedObservable<string>(
+    () => counter.Value.ToString(),
+    counter);
 
 var label = UI.Label("0", font, brush)
     .BindText(counterText);
 
-counter.Value = 10;  // counterText обновится, label обновится
+counter.Value = 10;  // counterText и label обновятся
 ```
 
 ### Паттерн 5: Ручная подписка
@@ -489,6 +897,43 @@ var subscription = observable.Subscribe(v =>
 subscription.Dispose();  // явная отписка
 ```
 
+### Паттерн 6: Реактивная коллекция
+
+```csharp
+var items = new ObservableList<string>();
+
+items.Changed += change =>
+{
+    if (change.Type == ListChangeType.Add)
+        Console.WriteLine($"Added: {change.Item}");
+    else if (change.Type == ListChangeType.Remove)
+        Console.WriteLine($"Removed: {change.Item}");
+};
+
+items.Add("Item 1");   // Added: Item 1
+items.Add("Item 2");   // Added: Item 2
+items.RemoveAt(0);     // Removed: Item 1
+```
+
+### Паттерн 7: Вычисляемое свойство с множественными зависимостями
+
+```csharp
+var a = new Observable<int>(1);
+var b = new Observable<int>(2);
+var c = new Observable<int>(3);
+
+var sum = new ComputedObservable<int>(
+    () => a.Value + b.Value + c.Value,
+    a, b, c);
+
+// sum.Value == 6
+a.Value = 10;
+// sum.Value == 15
+```
+
+---
+
+<a id="mistakes"></a>
 ## Типичные ошибки
 
 ### Ошибка 1: Забытая отписка
@@ -527,10 +972,9 @@ observable.Subscribe(v =>
 ```csharp
 // Неправильно: изменение Observable до привязки
 var observable = new Observable<string>("Initial");
-observable.Value = "Updated";  // изменение до привязки
+observable.Value = "Updated";
 
-var label = UI.Label("Text", font, brush)
-    .BindText(observable);
+var label = UI.Label("Text", font, brush).BindText(observable);
 // label.Text = "Updated" — корректно, но логика запутанная
 ```
 
@@ -539,14 +983,10 @@ var label = UI.Label("Text", font, brush)
 ### Ошибка 4: Множественные привязки к одному Observable
 
 ```csharp
-// Неправильно: две привязки к одному Observable
 var observable = new Observable<string>("Text");
 
-var label1 = UI.Label("Text", font, brush)
-    .BindText(observable);
-
-var label2 = UI.Label("Text", font, brush)
-    .BindText(observable);
+var label1 = UI.Label("Text", font, brush).BindText(observable);
+var label2 = UI.Label("Text", font, brush).BindText(observable);
 
 // Оба label обновятся — корректно, но может быть неочевидно
 ```
@@ -564,68 +1004,23 @@ observable1.Subscribe(v =>
 {
     observable2.Value = v * 2;  // изменение observable2 в подписчике observable1
 });
-
-observable2.Subscribe(v =>
-{
-    Console.WriteLine($"observable2: {v}");
-});
-
-observable1.Value = 10;
-// выведет "observable2: 20" — корректно, но логика сложная
 ```
 
 **Решение:** избегать циклических зависимостей между `Observable`.
 
-## Расширенные сценарии
-
-### ComputedObservable (планируется)
-
-Реактивное свойство, вычисляемое на основе других `Observable`:
+### Ошибка 6: Использование неправильного типа Observable
 
 ```csharp
-// Планируемая функциональность
-var a = new Observable<int>(10);
-var b = new Observable<int>(20);
-var sum = ComputedObservable.Create(() => a.Value + b.Value);
-
-// sum.Value = 30
-// при изменении a или b — sum автоматически пересчитается
+// Неправильно: Observable<object> вместо Observable<IBrush>
+var brush = new Observable<object>(UI.SolidBrush(Color.Red));
+label.BindForegroundBrush(brush);  // ошибка компиляции
 ```
 
-### ObservableList<T> (планируется)
+**Решение:** использовать конкретный тип `Observable<IBrush>`.
 
-Реактивный список, уведомляющий об изменениях:
+---
 
-```csharp
-// Планируемая функциональность
-var list = new ObservableList<string>();
-
-list.Subscribe(change =>
-{
-    Console.WriteLine($"Changed: {change.Type}");
-});
-
-list.Add("Item 1");  // уведомит подписчиков
-list.Remove("Item 1");  // уведомит подписчиков
-```
-
-### ConditionalNode (планируется)
-
-Условный контейнер, отображающий одного из детей в зависимости от `Observable<bool>`:
-
-```csharp
-// Планируемая функциональность
-var isVisible = new Observable<bool>(true);
-
-var conditional = new ConditionalNode(
-    isVisible,
-    UI.Label("Visible", font, brush),
-    UI.Label("Hidden", font, grayBrush)
-);
-
-isVisible.Value = false;  // отобразится второй label
-```
-
+<a id="performance"></a>
 ## Производительность
 
 ### Избегание лишних уведомлений
@@ -676,7 +1071,7 @@ counter.Subscribe(v =>
 // Неправильно: аллокация строки на каждое уведомление
 observable.Subscribe(v =>
 {
-    label.Component.Text = $"Value: {v}";  // аллокация строки
+    label.Component.Text = $"Value: {v}";
 });
 
 // Правильно: переиспользование буфера
@@ -689,6 +1084,13 @@ observable.Subscribe(v =>
 });
 ```
 
+### Batch-обновления
+
+При изменении нескольких зависимостей в одном тике `ComputedObservable<T>` пересчитывается несколько раз. См. ROADMAP → «Batch-обновления ComputedObservable».
+
+---
+
+<a id="testing"></a>
 ## Тестирование
 
 ### Тест базовой функциональности
@@ -699,10 +1101,10 @@ public void Observable_ValueChange_NotifiesSubscribers()
 {
     var observable = new Observable<int>(0);
     int lastValue = -1;
-    
+
     observable.Subscribe(v => lastValue = v);
     observable.Value = 10;
-    
+
     Assert.That(lastValue, Is.EqualTo(10));
 }
 ```
@@ -715,10 +1117,10 @@ public void Observable_SameValue_DoesNotNotify()
 {
     var observable = new Observable<int>(10);
     int callCount = 0;
-    
+
     observable.Subscribe(_ => callCount++);
-    observable.Value = 10;  // то же значение
-    
+    observable.Value = 10;
+
     Assert.That(callCount, Is.EqualTo(0));
 }
 ```
@@ -731,15 +1133,15 @@ public void Observable_Unsubscribe_StopsNotifications()
 {
     var observable = new Observable<int>(0);
     int lastValue = -1;
-    
+
     var subscription = observable.Subscribe(v => lastValue = v);
     observable.Value = 1;
-    
+
     Assert.That(lastValue, Is.EqualTo(1));
-    
+
     subscription.Dispose();
     observable.Value = 2;
-    
+
     Assert.That(lastValue, Is.EqualTo(1));  // не изменилось
 }
 ```
@@ -752,12 +1154,12 @@ public void Observable_MultipleSubscribers_AllNotified()
 {
     var observable = new Observable<int>(0);
     int subscriber1 = 0, subscriber2 = 0;
-    
+
     observable.Subscribe(v => subscriber1 = v);
     observable.Subscribe(v => subscriber2 = v);
-    
+
     observable.Value = 42;
-    
+
     Assert.That(subscriber1, Is.EqualTo(42));
     Assert.That(subscriber2, Is.EqualTo(42));
 }
@@ -771,15 +1173,77 @@ public void Observable_ExceptionInSubscriber_DoesNotBreakChain()
 {
     var observable = new Observable<int>(0);
     int lastValue = -1;
-    
+
     observable.Subscribe(_ => throw new InvalidOperationException("Test"));
     observable.Subscribe(v => lastValue = v);
-    
+
     Assert.DoesNotThrow(() => observable.Value = 10);
     Assert.That(lastValue, Is.EqualTo(10));
 }
 ```
 
-## Заключение
+### Тест ComputedObservable
 
-`Observable<T>` — потокобезопасное реактивное свойство, уведомляющее подписчиков об изменении значения. Виджеты автоматически отписываются при `Dispose`, что предотвращает утечки памяти. Подписчики должны быть потокобезопасными и не блокировать поток надолго. Исключения в подписчиках перехватываются и игнорируются, что требует осторожности при отладке.
+```csharp
+[Test]
+public void ComputedObservable_RecomputesOnDependencyChange()
+{
+    var a = new Observable<int>(2);
+    var b = new Observable<int>(3);
+
+    var sum = new ComputedObservable<int>(() => a.Value + b.Value, a, b);
+
+    Assert.That(sum.Value, Is.EqualTo(5));
+
+    a.Value = 10;
+    Assert.That(sum.Value, Is.EqualTo(13));
+}
+```
+
+### Тест ObservableList
+
+```csharp
+[Test]
+public void ObservableList_AddRaisesChangedEvent()
+{
+    var list = new ObservableList<int>();
+    ListChange<int> last = default;
+    list.Changed += c => last = c;
+
+    list.Add(42);
+
+    using (Assert.EnterMultipleScope())
+    {
+        Assert.That(last.Type, Is.EqualTo(ListChangeType.Add));
+        Assert.That(last.NewIndex, Is.EqualTo(0));
+        Assert.That(last.Item, Is.EqualTo(42));
+    }
+}
+```
+
+### Тест потокобезопасности
+
+```csharp
+[Test]
+public void ObservableList_ChangedHandler_CanModifyList()
+{
+    var list = new ObservableList<int>();
+    bool reentered = false;
+
+    list.Changed += c =>
+    {
+        if (!reentered && c.Type == ListChangeType.Add)
+        {
+            reentered = true;
+            list.Add(100);
+        }
+    };
+
+    Assert.DoesNotThrow(() => list.Add(1));
+    using (Assert.EnterMultipleScope())
+    {
+        Assert.That(reentered, Is.True);
+        Assert.That(list.Count, Is.EqualTo(2));
+    }
+}
+```

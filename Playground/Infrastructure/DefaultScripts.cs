@@ -1,4 +1,22 @@
-﻿namespace DisplayNodes.Playground.Infrastructure
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+namespace DisplayNodes.Playground.Infrastructure
 {
 	/// <summary>
 	/// Шаблоны скриптов для DisplayNodes Playground.
@@ -10,16 +28,18 @@
 		/// </summary>
 		public const string HELLO =
 @"IFont font = UI.Font(""Segoe UI"", 14f);
-IBrush white = UI.Brush(Color.White.FromGdi());
-IBrush green = UI.Brush(Color.LimeGreen.FromGdi());
-IBrush gray = UI.Brush(Color.Gray.FromGdi());
 
-var node = UI.Column(8)
-    .Add(UI.Label(""Hello, DisplayNodes!"", font, white))
+IBrush transparent = UI.SolidBrush(Color.FromArgb(255, 45, 45, 48).FromGdi());
+IBrush red = UI.SolidBrush(Color.Red.FromGdi());
+IBrush green = UI.SolidBrush(Color.Green.FromGdi());
+IBrush blue = UI.SolidBrush(Color.Blue.FromGdi());
+
+var node = UI.Column(8).Margin(150)
+    .Add(UI.Label(""Hello, DisplayNodes!"", font, red).BackgroundBrush(transparent))
     .Add(UI.Fixed(0, 4))
     .Add(UI.Row(12)
-        .Add(UI.Label(""Status:"", font, gray))
-        .Add(UI.Label(""OK"", font, green)));
+        .Add(UI.Label(""Status:"", font, blue).BackgroundBrush(transparent))
+        .Add(UI.Label(""OK"", font, green).BackgroundBrush(transparent)));
     
 return node;";
 
@@ -36,7 +56,7 @@ using (SolidBrush brush = new SolidBrush(Color.Black))
         .Add(UI.Label(""Hello, DisplayNodes!"", font, brush.Wrap()))
         .Add(UI.Row(8)
             .Add(UI.Label(""Status:"", font, brush))
-            .Add(UI.Label(""OK"", font, UI.Brush(Color.Green)))
+            .Add(UI.Label(""OK"", font, UI.SolidBrush(Color.Green)))
         );
 }";
 
@@ -47,7 +67,7 @@ using (SolidBrush brush = new SolidBrush(Color.Black))
 @"// Метод должен вернуть LayoutNode.
 //
 // Пример:
-// return UI.Label(""Hello"", UI.Font(""Segoe UI"", 14f), UI.Brush(Color.White));
+// return UI.Label(""Hello"", UI.Font(""Segoe UI"", 14f), UI.SolidBrush(Color.White));
 
 throw new NotImplementedException();";
 	}

@@ -1,8 +1,28 @@
-﻿using System;
-using System.Drawing;
-using System.Windows.Forms;
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+using DisplayNodes.Core;
 using DisplayNodes.Core.Rendering;
 using DisplayNodes.Gdi;
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using Color = System.Drawing.Color;
 
 namespace DisplayNodes.WinFormsAdapter.Components
 {
@@ -132,6 +152,19 @@ namespace DisplayNodes.WinFormsAdapter.Components
 
         [Obsolete("Не поддерживается WinForms")]
         public double Contrast { get; set; }
+
+        private Shadow? _shadow;
+        public Shadow? Shadow
+        {
+            get => _shadow;
+            set
+            {
+                if (value.HasValue)
+                    throw new NotSupportedException(
+                        "Shadow is not supported by WinFormsAdapter yet.");
+                _shadow = null;
+            }
+        }
 
         public void Dispose()
         {

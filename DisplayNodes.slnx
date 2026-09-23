@@ -1,15 +1,21 @@
 <Solution>
+
+  <Project Path="Kernel/Kernel.csproj" Id="aacc9e12-a41a-48df-80bc-c4b528a46962" />
+  
   <Project Path="Gdi/Gdi.csproj" Id="5a5e7ba5-c69d-4b22-ac2c-f31e38ff739e">
     <BuildDependency Project="Kernel/Kernel.csproj" />
   </Project>
-  <Project Path="Kernel/Kernel.csproj" Id="aacc9e12-a41a-48df-80bc-c4b528a46962" />
+  
   <Project Path="LibDisplayDrawingAdapter/LibDisplayDrawingAdapter.csproj" Id="3d78f5d2-29d6-4af3-9d7e-505f8cd9ff1f">
     <BuildDependency Project="Gdi/Gdi.csproj" />
     <BuildDependency Project="Kernel/Kernel.csproj" />
   </Project>
+  
+  <Project Path="WinFormsAdapter/WinFormsAdapter.csproj" Id="a0e420fc-5d0c-4422-a73c-63ff871a5b42" />
+  
   <Project Path="Playground/Playground.csproj" Id="485e1267-1429-4ca0-8eba-844d11376d58">
     <BuildDependency Project="WinFormsAdapter/WinFormsAdapter.csproj" />
   </Project>
+  
   <Project Path="Tests/Tests.csproj" Id="4df7544a-3bdc-4652-931b-ca765f6a522b" />
-  <Project Path="WinFormsAdapter/WinFormsAdapter.csproj" Id="a0e420fc-5d0c-4422-a73c-63ff871a5b42" />
 </Solution>

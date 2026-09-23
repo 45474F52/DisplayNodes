@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<Import
+		Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"
+		Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+
+	<PropertyGroup>
+		<Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+		<Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+		<ProjectGuid>{3D78F5D2-29D6-4AF3-9D7E-505F8CD9FF1F}</ProjectGuid>
+		<OutputType>Library</OutputType>
+		<AppDesignerFolder>Properties</AppDesignerFolder>
+		<RootNamespace>DisplayNodes.LibDisplayDrawingAdapter</RootNamespace>
+		<AssemblyName>LibDisplayDrawingAdapter</AssemblyName>
+		<TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+		<FileAlignment>512</FileAlignment>
+		<Deterministic>true</Deterministic>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+		<DebugSymbols>true</DebugSymbols>
+		<DebugType>full</DebugType>
+		<Optimize>false</Optimize>
+		<OutputPath>bin\Debug\</OutputPath>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<DebugType>pdbonly</DebugType>
+		<Optimize>true</Optimize>
+		<OutputPath>bin\Release\</OutputPath>
+		<DefineConstants>TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<Reference Include="System" />
+		<Reference Include="System.Core" />
+		<Reference Include="System.Drawing" />
+		<Reference Include="System.Xml.Linq" />
+		<Reference Include="System.Data.DataSetExtensions" />
+		<Reference Include="System.Data" />
+		<Reference Include="System.Xml" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<Compile Include="Components\ComponentBase.cs" />
+		<Compile Include="Components\Image.cs" />
+		<Compile Include="Components\Label.cs" />
+		<Compile Include="Components\Layout.cs" />
+		<Compile Include="Components\Masks\CircleMask.cs" />
+		<Compile Include="Components\Masks\EllipseMask.cs" />
+		<Compile Include="Components\Masks\MaskBase.cs" />
+		<Compile Include="Components\Masks\PathMask.cs" />
+		<Compile Include="Components\Masks\RectMask.cs" />
+		<Compile Include="Components\Masks\RoundedRectMask.cs" />
+		<Compile Include="Components\Masks\MaskClippingBase.cs" />
+		<Compile Include="Adapter.cs" />
+		<Compile Include="RenderRoot.cs" />
+		<Compile Include="RenderRootFactory.cs" />
+		<Compile Include="WidgetFactory.cs" />
+		<Compile Include="Properties\AssemblyInfo.cs" />
+	</ItemGroup>
+	
+	<ItemGroup>
+		<ProjectReference Include="..\Gdi\Gdi.csproj">
+			<Project>{5a5e7ba5-c69d-4b22-ac2c-f31e38ff739e}</Project>
+			<Name>Gdi</Name>
+		</ProjectReference>
+		
+		<ProjectReference Include="..\Kernel\Kernel.csproj">
+			<Project>{aacc9e12-a41a-48df-80bc-c4b528a46962}</Project>
+			<Name>Kernel</Name>
+		</ProjectReference>
+	</ItemGroup>
+
+	<Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

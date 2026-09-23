@@ -1,4 +1,22 @@
-﻿using System;
+﻿///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2026 AES
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+///////////////////////////////////////////////////////////////////////////
+
+using System;
 
 using DisplayNodes.Core;
 using DisplayNodes.Core.Rendering;
@@ -10,7 +28,7 @@ namespace DisplayNodes.Fluent
 	public static class LabelNodeFluent
 	{
 		/// <summary>Устанавливает цвет фона.</summary>
-		public static LabelNode FullBrush(this LabelNode node, Color color)
+		public static LabelNode BackgroundBrush(this LabelNode node, Color color)
 		{
 			if (UI.BrushFactory == null)
 				throw new InvalidOperationException("UI.BrushFactory is not initialized.");
@@ -20,7 +38,7 @@ namespace DisplayNodes.Fluent
 		}
 
 		/// <summary>Устанавливает абстрактную кисть фона напрямую.</summary>
-		public static LabelNode FullBrush(this LabelNode node, IBrush brush)
+		public static LabelNode BackgroundBrush(this LabelNode node, IBrush brush)
 		{
 			node.Component.BackgroundBrush = brush;
 			return node;

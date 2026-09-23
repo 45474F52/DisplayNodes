@@ -1,7 +1,27 @@
-# РУКОВОДСТВО
+# Руководство
 
 Руководство для разработчиков, вносящих изменения в DisplayNodes.
 
+## Содержание
+
+1. [Общие принципы](#principles)
+2. [Структура проекта](#structure)
+3. [Целевой фреймворк](#target)
+4. [Стиль кода](#style)
+5. [Стиль документации](#docs)
+6. [Reactive-примитивы](#reactive)
+7. [Визуальные эффекты и NotSupportedException](#effects)
+8. [Добавление нового контейнера](#new-container)
+9. [Добавление нового виджета](#new-widget)
+10. [Добавление нового бэкенда](#new-backend)
+11. [Тестирование](#testing)
+12. [Коммиты](#commits)
+13. [Pull Requests](#pull-requests)
+14. [Чек-лист перед отправкой](#checklist)
+
+---
+
+<a id="principles"></a>
 ## Общие принципы
 
 - Ядро (`Kernel`) не должно знать о конкретных бэкендах рендеринга.
@@ -10,6 +30,9 @@
 - Публичный API должен быть покрыт XML-документацией на русском языке.
 - Breaking changes требуют обсуждения. Добавление функционала — обратно совместимо.
 
+---
+
+<a id="structure"></a>
 ## Структура проекта
 
 ```
@@ -21,11 +44,16 @@ DisplayNodes/
 │   ├── Fluent/            # UI-фабрика, DisplayRoot, fluent-расширения
 │   └── Helpers/           # Методы расширения для обхода дерева
 ├── Gdi/                   # GDI+-реализации (GdiFont, GdiBrush, GdiTextMeasurer)
-├── WinFormsAdapter/       # Бэкенд на WinForms
 ├── Tests/                 # NUnit-тесты
 └── Playground/            # IDE для скриптов
+    ├── Compilation/       # Компилятор скриптов
+    ├── Editor/            # CodeEditor, подсветка, автодополнение
+    └── Infrastructure/    # Настройки, логирование, состояние
 ```
 
+---
+
+<a id="target"></a>
 ## Целевой фреймворк
 
 - **Ядро и адаптеры:** .NET Framework 3.5 (обусловлено средой применения).
@@ -34,6 +62,9 @@ DisplayNodes/
 
 Не используйте API из .NET 4.0+ в ядре (`Lazy<T>`, `Tuple`, `dynamic`, `ArrayPool`, `Task`, async/await).
 
+---
+
+<a id="style"></a>
 ## Стиль кода
 
 ### Именование
@@ -70,7 +101,7 @@ var gdiColor = System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
 
 ### Структуры (value types)
 
-- Все базовые типы (`Point`, `Size`, `Rect`, `Thickness`, `Color`, `GridLength`) — `readonly struct`.
+- Все базовые типы (`Point`, `Size`, `Rect`, `Thickness`, `Color`, `GridLength`, `Percent`, `GradientStop`, `Shadow`, `Transform`) — `readonly struct`.
 - Реализуйте `IEquatable<T>`, операторы `==`/`!=`, переопределяйте `Equals`/`GetHashCode`/`ToString`.
 - Добавляйте `[DebuggerDisplay("...")]` для удобства отладки.
 - Избегайте мутабельных структур.
@@ -89,8 +120,9 @@ public readonly struct Point : IEquatable<Point>
 ### Классы (reference types)
 
 - `LayoutNode` — абстрактный базовый класс.
-- Контейнеры (`StackLayoutNode`, `GridNode`, ...) — наследники `LayoutNode`.
-- Виджеты (`LabelNode`, `ImageNode`) — наследники `WidgetNode`.
+- Контейнеры (`StackLayoutNode`, `GridNode`, `WrapPanelNode`, `ConditionalNode`, `TransformNode`, `OverlayNode`) — наследники `LayoutNode`.
+- Виджеты (`LabelNode`, `ImageNode`, `BackgroundNode`) — наследники `WidgetNode`.
+- `StretchNode` — наследник `LayoutNode`, публичный, без детей.
 - Компоненты рендерера — реализуют `IRenderComponent` + специализированные интерфейсы.
 
 ### XML-документация
@@ -114,6 +146,7 @@ public Size Measure(Size available) { ... }
 - `ArgumentOutOfRangeException` — для некорректных значений (отрицательные размеры, индексы вне диапазона).
 - `InvalidOperationException` — для вызовов в некорректном состоянии (например, `UI.Font` до инициализации).
 - `ArgumentException` — для общих ошибок аргументов.
+- `NotSupportedException` — для функциональности, описанной в API, но не реализованной в текущей версии (см. [Визуальные эффекты](#effects)).
 
 Всегда указывайте `nameof(param)`:
 
@@ -124,7 +157,8 @@ if (child == null)
 
 ### Потокобезопасность
 
-- `Observable<T>` использует `lock` для защиты подписчиков.
+- `Observable<T>` использует `lock` для защиты подписчиков и значения.
+- `ObservableList<T>` использует `lock` для защиты коллекции.
 - `ApiIndex` в Playground — `lock` для словарей.
 - `[ThreadStatic]` для кэшей GDI-объектов (`GdiTextMeasurer`).
 - UI-компоненты (`IRenderComponent`) должны использоваться только из потока, в котором созданы.
@@ -150,6 +184,116 @@ label.Font = font.Wrap();
 font.Dispose();  // адаптер может использовать освобождённый ресурс
 ```
 
+---
+
+<a id="docs"></a>
+## Стиль документации
+
+- Все XML-комментарии — на русском языке.
+- Примеры кода в `<code>` или `<example>`.
+- Ссылки через `<see cref="..."/>`, `<paramref name="..."/>`, `<typeparamref name="..."/>`.
+- Разделы `<remarks>` для дополнительного контекста.
+- Документация в `docs/*.md` — обновляется при изменениях публичного API.
+- При переименовании публичных API — отражается в `docs/CHANGELOG.md` (раздел `Renamed`).
+- **Не упоминайте закрытые легаси-проекты** в документации. Используйте нейтральные формулировки («адаптер», «бэкенд»).
+
+---
+
+<a id="reactive"></a>
+## Reactive-примитивы
+
+### Observable\<T\>
+
+Основной реактивный примитив. Реализует `IObservableSource`.
+
+- Потокобезопасен через `lock`.
+- Уведомляет подписчиков только при изменении значения.
+- Уведомления — вне `lock` (избегаем deadlock).
+- Исключения в подписчиках перехватываются.
+
+### IObservableSource
+
+Не-generic интерфейс для унификации `Observable<T>` с разными `T`:
+
+```csharp
+public interface IObservableSource
+{
+    IDisposable Subscribe(Action<object> callback);
+}
+```
+
+**Зачем:** из-за инвариантности generic'ов в C# нельзя передать `Observable<int>` и `Observable<string>` в один массив `Observable<object>[]`. Через `IObservableSource` — можно.
+
+**При добавлении нового реактивного класса:** если он должен поддерживать зависимости разных типов — реализуйте `IObservableSource` явно.
+
+### ComputedObservable\<T\>
+
+Вычисляемое свойство на основе других источников.
+
+- Начальное значение вычисляется в конструкторе через `ComputeInitial`.
+- При изменении любой зависимости вызывается `compute()`.
+- Исключения в `compute` перехватываются — старое значение остаётся, подписчики не уведомляются.
+- `Dispose` отписывается от всех зависимостей.
+- `Refresh()` — ручной пересчёт.
+
+**При добавлении нового Computed-типа:** следуйте тем же принципам — начальное значение в конструкторе, отписка в `Dispose`, защита от исключений.
+
+### ObservableList\<T\>
+
+Реактивная коллекция с событием `Changed`.
+
+- Потокобезопасна через `lock`.
+- Событие `Changed` вызывается **вне lock'а** — подписчик может безопасно изменять коллекцию.
+- Все подписчики вызываются **отдельно** через `GetInvocationList()`. Исключение в одном не ломает цепочку.
+- `Dispose` делает коллекцию непригодной: любая операция бросает `ObjectDisposedException`.
+- `GetEnumerator` возвращает enumerator `List<T>` — `foreach` бросает `InvalidOperationException` при модификации.
+- `ToList()` — безопасный снимок.
+
+**При добавлении новых реактивных коллекций:** вызывайте подписчиков через `GetInvocationList()` — multicast delegate прерывает цепочку при исключении в одном из подписчиков.
+
+### ListChange\<T\> и ListChangeType
+
+`ListChange<T>` — readonly struct, описывающий одно изменение: `Type`, `OldIndex`, `NewIndex`, `Item`.
+
+`ListChangeType` — enum: `Add`, `Insert`, `Remove`, `Replace`, `Move`, `Reset`.
+
+**Соглашение:** для `Add`/`Insert` — `OldIndex = -1`, для `Remove` — `NewIndex = -1`, для `Reset` — оба `-1`.
+
+---
+
+<a id="effects"></a>
+## Визуальные эффекты и NotSupportedException
+
+Три визуальных эффекта описаны в API ядра, но **не поддерживаются** текущими адаптерами:
+
+| Эффект | API | Поведение в адаптере |
+|---|---|---|
+| Градиенты | `IBrushFactory.CreateLinearGradient`/`CreateRadialGradient` | `GdiConversions.ToGdi(IBrush)` бросает `NotSupportedException` для градиентных кистей |
+| Shadow | `IEffectComponent.Shadow?` | Setter бросает `NotSupportedException` при `value.HasValue` |
+| TransformNode | `TransformNode` в дереве | `ApplyRecursive` бросает `NotSupportedException` при обнаружении |
+
+### Паттерн
+
+**API готовится заранее, реализация в адаптерах — отдельная задача.** Это позволяет:
+
+1. Ядро и адаптеры не блокируют друг друга.
+2. Потребители видят в API все возможности сразу.
+3. `NotSupportedException` с внятным сообщением показывает, что функциональность есть, но не реализована в конкретном бэкенде.
+
+### Как добавлять новые эффекты
+
+1. Описать API в ядре (интерфейс, структура, свойство).
+2. Добавить Fluent-метод.
+3. Реализовать setter в адаптерах с `NotSupportedException` при не-null/не-default значении.
+4. Задокументировать ограничение в `<remarks>`.
+5. В `docs/CHANGELOG.md` — раздел `Added` с пометкой «API + `NotSupportedException` в адаптерах».
+6. В `docs/ROADMAP.md` — пункт «Реализация X в адаптерах».
+
+**Правило:** сообщение `NotSupportedException` должно содержать имя бэкенда и явное «not supported by this adapter yet».
+
+---
+
+<a id="new-container"></a>
 ## Добавление нового контейнера
 
 1. Создайте класс в `Kernel/Core`, наследник `LayoutNode`.
@@ -176,8 +320,17 @@ public static MyContainerNode MyContainer(int param)
 6. Добавьте fluent-расширения в `LayoutNodeFluent` или отдельный файл.
 7. Напишите NUnit-тесты в `Tests/Core/`.
 
-Пример: см. `StackLayoutNode`, `GridNode`, `UniformGridNode`, `OverlayNode`.
+**Примеры:** см. `StackLayoutNode`, `GridNode`, `UniformGridNode`, `OverlayNode`, `WrapPanelNode`, `ConditionalNode`, `TransformNode`.
 
+### Особые случаи
+
+- **`ConditionalNode`** — хранит оба поддерева в `Children` всегда, неактивное пропускает в Measure/Arrange. Реализует `IDisposable` для отписки от `Observable<bool>`.
+- **`TransformNode`** — `Measure` возвращает bounding box трансформированного ребёнка. В `ApplyRecursive` бросает `NotSupportedException`.
+- **`WrapPanelNode`** — Stateless Measure/Arrange (пересчёт при каждом Arrange).
+
+---
+
+<a id="new-widget"></a>
 ## Добавление нового виджета
 
 1. Создайте класс в `Kernel/Widgets`, наследник `WidgetNode`.
@@ -199,9 +352,58 @@ public MyWidget BindValue(Observable<string> source)
 5. Добавьте fluent-расширения.
 6. Напишите тесты.
 
-Пример: см. `LabelNode`, `ImageNode`, `BackgroundNode`, `ClipNode`.
+**Примеры:** см. `LabelNode`, `ImageNode`, `BackgroundNode`, `ClipNode`.
 
-## Добавление нового бэкенда (адаптера)
+### Соглашения об именовании методов привязки
+
+| Свойство компонента | Метод привязки |
+|---|---|
+| `ILabelComponent.Text` | `BindText` |
+| `ILabelComponent.Font` | `BindFont` |
+| `ILabelComponent.ForegroundBrush` | `BindForegroundBrush` |
+| `ILabelComponent.BackgroundBrush` | `BindBackgroundBrush` |
+| `IImageComponent.Image` | `BindBitmap` |
+| `IImageComponent.SizeMode` | `BindSizeMode` |
+| `IRenderComponent.Visible` | `BindVisible` |
+| `IEffectComponent.Opacity` | `BindOpacity` |
+| `IEffectComponent.Brightness` | `BindBrightness` |
+| `IEffectComponent.Contrast` | `BindContrast` |
+
+**История переименований:**
+- `BindBrush` → `BindForegroundBrush`.
+- `BindFullBrush` → `BindBackgroundBrush`.
+- `LabelNodeFluent.FullBrush` → `BackgroundBrush`.
+- `UI.Brush(Color)` → `UI.SolidBrush(Color)`.
+
+### `StretchNode`
+
+Публичный узел, растягивающийся вдоль обеих осей. Полезен как flex-ребёнок в `StackLayoutNode`:
+
+```csharp
+public sealed class StretchNode : LayoutNode
+{
+    public int NaturalWidth { get; }
+    public int NaturalHeight { get; }
+
+    public StretchNode(int naturalWidth = 0, int naturalHeight = 0)
+    {
+        NaturalWidth = naturalWidth;
+        NaturalHeight = naturalHeight;
+        HAlignment = Alignment.Stretch;
+        VAlignment = Alignment.Stretch;
+    }
+
+    protected override Size MeasureOverride(Size available)
+        => new Size(NaturalWidth, NaturalHeight);
+
+    protected override void ArrangeOverride(Rect finalRect) { }
+}
+```
+
+---
+
+<a id="new-backend"></a>
+## Добавление нового бэкенда
 
 См. подробное руководство в `CUSTOM_ADAPTERS_GUIDELINE.md`. Краткий чек-лист:
 
@@ -209,11 +411,18 @@ public MyWidget BindValue(Observable<string> source)
 2. Реализуйте `IWidgetFactory` (создание Label, Image, Masks).
 3. Реализуйте `IRenderRootFactory` и `IRenderRoot`.
 4. Реализуйте `ILayoutComponent` (корневой контейнер).
-5. Реализуйте `ILabelComponent`, `IImageComponent`, `IMaskComponent`.
-6. Адаптеры должны клонировать ресурсы при установке.
-7. Реализуйте `IDisposable` во всех компонентах.
-8. Создайте статический класс `Adapter` с методом `Initialize()`.
+5. Реализуйте `ILabelComponent`, `IImageComponent`, `IMaskComponent`, `IEffectComponent`.
+6. Реализуйте свойство `Shadow?` — бросает `NotSupportedException` при не-null.
+7. `GdiConversions.ToGdi(IBrush)` — бросает `NotSupportedException` для градиентов.
+8. `ApplyRecursive` — бросает `NotSupportedException` для `TransformNode`.
+9. Адаптеры клонируют ресурсы при установке.
+10. Реализуйте `IDisposable` во всех компонентах.
+11. Создайте статический класс `Adapter` с методом `Initialize()`.
+12. Напишите тесты: `_ClonesOnSet_OriginalNotDisposedByAdapter`, проверка `NotSupportedException`, `Dispose`.
 
+---
+
+<a id="testing"></a>
 ## Тестирование
 
 ### Структура тестов
@@ -222,9 +431,9 @@ public MyWidget BindValue(Observable<string> source)
 Tests/
 ├── Core/                  # Тесты контейнеров и типов
 ├── Gdi/                   # Тесты GDI-обёрток
-├── Adapters/
-│   └── WinFormsAdapter/
-└── Playground/            # (опционально) тесты компиляции
+├── Fluent/                # Тесты fluent-расширений
+├── Adapters/              # Тесты адаптеров
+└── ...
 ```
 
 ### Правила написания тестов
@@ -235,7 +444,13 @@ Tests/
   - Measure/Arrange для контейнеров.
   - Клонирование ресурсов в адаптерах (`_ClonesOnSet_OriginalNotDisposedByAdapter`).
   - Граничные случаи (null, пустые коллекции, отрицательные размеры).
+  - Реактивность: уведомление при изменении `Observable`, отсутствие уведомления при неизменном значении, отписка при `Dispose`.
+  - `ObservableList`: multicast delegate не прерывает цепочку при исключении в подписчике.
+  - `ComputedObservable`: chained computed, `Refresh`, `Dispose`.
+  - `TransformNode`: float-шумы (`Measure_Rotation90` должен давать `50`, не `51`).
 - Освобождайте ресурсы в тестах: `(component as IDisposable)?.Dispose()`.
+
+### Пример теста
 
 ```csharp
 [Test]
@@ -270,6 +485,9 @@ nunit3-console Tests/bin/Debug/Tests.dll
 nunit3-console Tests/bin/Debug/Tests.dll --where "name == GridNodeTests"
 ```
 
+---
+
+<a id="commits"></a>
 ## Коммиты
 
 ### Формат сообщения
@@ -291,18 +509,21 @@ nunit3-console Tests/bin/Debug/Tests.dll --where "name == GridNodeTests"
 - `test` — добавление или исправление тестов.
 - `chore` — инфраструктура, зависимости, конфигурация.
 - `perf` — оптимизация производительности.
-- `style` — форматирование, пробелы, точки с запятой (без изменения логики).
+- `style` — форматирование (без изменения логики).
 
 ### Область
 
 - `core` — ядро (LayoutNode, контейнеры, типы).
 - `rendering` — интерфейсы рендеринга.
-- `widgets` — виджеты (Label, Image, Clip).
+- `widgets` — виджеты (Label, Image, Clip, Background).
 - `fluent` — UI-фабрика, fluent-расширения.
 - `gdi` — GDI+-реализации.
-- `adapter` — адаптеры (укажите конкретный: `winforms`, `...`).
+- `adapter` — адаптеры (укажите конкретный: `winforms`, ...).
+- `reactive` — `Observable`, `ComputedObservable`, `ObservableList`.
+- `effects` — градиенты, Shadow, Transform.
 - `playground` — IDE.
 - `tests` — тесты.
+- `docs` — документация.
 
 ### Примеры
 
@@ -311,13 +532,22 @@ feat(core): добавить WrapPanelNode для переноса строк
 
 fix(gdi): исправить утечку GDI-handles в GdiTextMeasurer
 
+feat(reactive): добавить ObservableList<T> с событием Changed
+
 docs(kernel): обновить README с примерами GridNode
 
 test(core): добавить тесты для UniformGridNode с Padding
 
 refactor(fluent): вынести BindText в отдельный метод LabelNode
+
+feat(effects): добавить API Shadow (NotSupportedException в адаптерах)
+
+chore(docs): исправить опечатки в EXAMPLES.md
 ```
 
+---
+
+<a id="pull-requests"></a>
 ## Pull Requests
 
 ### Перед созданием PR
@@ -327,6 +557,7 @@ refactor(fluent): вынести BindText в отдельный метод Label
 3. Обновите документацию, если изменился публичный API.
 4. Добавьте тесты для новой функциональности.
 5. Проверьте, что изменения обратно совместимы (если это не breaking change).
+6. Отразите переименования в `docs/CHANGELOG.md` (раздел `Renamed`).
 
 ### Описание PR
 
@@ -342,7 +573,10 @@ refactor(fluent): вынести BindText в отдельный метод Label
 - Автор PR отвечает на комментарии и вносит правки.
 - После одобрения автор сливает PR (squash merge предпочтителен).
 
-## Проверка перед отправкой
+---
+
+<a id="checklist"></a>
+## Чек-лист перед отправкой
 
 - [ ] Все тесты проходят.
 - [ ] Код компилируется без предупреждений.
@@ -351,10 +585,9 @@ refactor(fluent): вынести BindText в отдельный метод Label
 - [ ] Ресурсы освобождаются корректно (нет утечек).
 - [ ] Потокобезопасность соблюдена (если применимо).
 - [ ] Коммиты следуют формату Conventional Commits.
-- [ ] Документация обновлена (README, примеры).
-
-## Вопросы и обсуждения
-
-- Для вопросов по API создайте Issue с меткой `question`.
-- Для предложений по функциональности — Issue с меткой `enhancement`.
-- Для сообщений об ошибках — Issue с меткой `bug` и минимальным воспроизводимым примером.
+- [ ] Документация обновлена (README, примеры, CHANGELOG).
+- [ ] Переименования отражены в `docs/CHANGELOG.md`.
+- [ ] Функциональность с `NotSupportedException` задокументирована.
+- [ ] В документации не упоминаются закрытые легаси-проекты.
+- [ ] Новые контейнеры/виджеты имеют `sealed override Arrange` (для контейнеров).
+- [ ] Новые реактивные классы вызывают подписчиков через `GetInvocationList()`.

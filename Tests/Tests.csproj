@@ -10,7 +10,8 @@
 		<RootNamespace>DisplayNodes.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
 		<Authors>AES</Authors>
 		<Description>DisplayNodes Tests</Description>
-		<Copyright>Copyright ©️ AES 2026</Copyright>
+		<Copyright>Copyright AES 2026</Copyright>
+		<Title>DisplayNodes Tests</Title>
 	</PropertyGroup>
 
 	<ItemGroup>
