@@ -41,6 +41,7 @@ namespace DisplayNodes.LibDisplayDrawingAdapter.Components
 
 		private Font _ownedFont;
 		private StringFormat _ownedFormat;
+		private Thickness _padding;
 
 		/// <summary>Создаёт адаптер текстовой метки.</summary>
 		public Label() : base(new Label2D(null))
@@ -104,8 +105,25 @@ namespace DisplayNodes.LibDisplayDrawingAdapter.Components
 				set => throw new NotSupportedException("UseMnemonic is not supported by LibDisplayDrawingAdapter.");
 		}
 
-		/// <inheritdoc/>
-		public TextDrawMethod DrawMethod
+        /// <summary>
+        /// Внутренние отступы текстовой области. Фон заливается на весь ClientRectangle,
+        /// текст позиционируется внутри прямоугольника, сдвинутого на padding
+        /// (аналог Padding у Label в WPF).
+        /// </summary>
+        public Thickness Padding
+        {
+            get => _padding;
+            set
+            {
+                if (_padding == value)
+                    return;
+                _padding = value;
+                _label.Refresh();
+            }
+        }
+
+        /// <inheritdoc/>
+        public TextDrawMethod DrawMethod
 		{
 			get => (TextDrawMethod)(int)_label.DrawMethod;
 			set => _label.DrawMethod = (TextDrawing.DrawMethod)(int)value;
