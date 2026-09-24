@@ -96,8 +96,8 @@ namespace DisplayNodes.WinFormsAdapter.Components
                 Math.Max(0, bounds.Width - _padding.Horizontal),
                 Math.Max(0, bounds.Height - _padding.Vertical));
 
-            Size textSize = TextRenderer.MeasureText(
-                e.Graphics, _label.Text, _label.Font, Size.Empty, TextFormatFlags.NoPadding);
+            System.Drawing.Size textSize = TextRenderer.MeasureText(
+                e.Graphics, _label.Text, _label.Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding);
 
             int x;
             switch (ToAlignment(align))

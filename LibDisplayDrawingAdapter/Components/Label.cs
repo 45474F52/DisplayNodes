@@ -41,6 +41,7 @@ namespace DisplayNodes.LibDisplayDrawingAdapter.Components
 
 		private Font _ownedFont;
 		private StringFormat _ownedFormat;
+		private Thickness _padding;
 
 		/// <summary>Создаёт адаптер текстовой метки.</summary>
 		public Label() : base(new Label2D(null))
