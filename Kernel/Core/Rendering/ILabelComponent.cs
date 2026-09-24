@@ -16,6 +16,10 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+using System;
+
+using DisplayNodes.Core;
+
 namespace DisplayNodes.Core.Rendering
 {
 	/// <summary>
@@ -54,5 +58,14 @@ namespace DisplayNodes.Core.Rendering
 		/// режима могут бросать <see cref="NotSupportedException"/>.
 		/// </summary>
 		bool UseMnemonic { get; set; }
+
+		/// <summary>
+		/// Внутренние отступы текстовой области метки. Фон и границы компонента
+		/// от padding НЕ уменьшаются — текст просто рисуется внутри прямоугольника,
+		/// сдвинутого на величину отступов (аналог Padding у Label в WPF).
+		/// <para>Значение по умолчанию — нулевые отступы. Компоненты, не умеющие
+		/// смещать текст, могут бросать <see cref="NotSupportedException"/> в сеттере.</para>
+		/// </summary>
+		Thickness Padding { get; set; }
 	}
 }

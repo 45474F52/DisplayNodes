@@ -56,6 +56,10 @@ namespace DisplayNodes.WinFormsAdapter.Component.Masks
             UpdateRegion();
         }
 
+        // Пока маска не получила ненулевой размер (первый кадр лэйаута ещё не прошёл),
+        // вместо Region строим пустую — иначе формы с нулевыми габаритами недопустимы для GDI+.
+        private bool HasValidSize => Width > 0 && Height > 0;
+
         protected virtual System.Drawing.Region CreateRegion()
         {
             return new System.Drawing.Region(new System.Drawing.Rectangle(0, 0, Width, Height));
@@ -64,7 +68,7 @@ namespace DisplayNodes.WinFormsAdapter.Component.Masks
         private void UpdateRegion()
         {
             Region?.Dispose();
-            Region = CreateRegion();
+            Region = HasValidSize ? CreateRegion() : new System.Drawing.Region(System.Drawing.Rectangle.Empty);
         }
     }
 }

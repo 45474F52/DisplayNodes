@@ -37,10 +37,25 @@ namespace DisplayNodes.LibDisplayDrawingAdapter.Components.Masks
 		/// <inheritdoc/>
 		protected override Region CreateRegion(RectangleF bounds)
 		{
+			// Нулевой размер на время лэйаута: возвращаем пустую область вместо недопустимой формы.
+			if (bounds.Width <= 0 || bounds.Height <= 0)
+				return new Region(RectangleF.Empty);
+
+			// Радиус не должен превращаться в ноль: AddArc с нулевым размером дуги — ArgumentException.
+			float r = Math.Max(0.5f, Math.Min(CornerRadius, Math.Min(bounds.Width, bounds.Height) / 2f));
+			if (r >= Math.Min(bounds.Width, bounds.Height) / 2f)
+			{
+				// Вырожденный случай (сторона <= 2*радиуса): обрезаем эллипсом целиком.
+				using (var path = new GraphicsPath())
+				{
+					path.AddEllipse(bounds);
+					return new Region(path);
+				}
+			}
+
+			float d = r * 2;
 			using (var path = new GraphicsPath())
 			{
-				float r = Math.Min(CornerRadius, Math.Min(bounds.Width, bounds.Height) / 2);
-				float d = r * 2;
 				path.AddArc(bounds.X, bounds.Y, d, d, 180, 90);
 				path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 90);
 				path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
