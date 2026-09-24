@@ -40,6 +40,9 @@ namespace DisplayNodes.WinFormsAdapter.Components
         private Color _cachedForeColor;
         private Color _cachedBackColor;
         private ContentAlignment _cachedAlign;
+        // Флаг: формат был установлен извне — нужно пересоздать кэш при следующем чтении,
+        // даже если ContentAlignment совпадает с закешированным (например Near+Far -> MiddleRight).
+        private bool _formatDirty;
 
         public Label() : base(new System.Windows.Forms.Label())
         {
@@ -111,11 +114,18 @@ namespace DisplayNodes.WinFormsAdapter.Components
         {
             get
             {
-                if (_ownedFormat == null || _cachedAlign != _label.TextAlign)
+                if (_ownedFormat == null || _formatDirty || _cachedAlign != _label.TextAlign)
                 {
                     _ownedFormat?.Dispose();
                     _cachedAlign = _label.TextAlign;
-                    _ownedFormat = new StringFormat { Alignment = ToAlignment(_label.TextAlign) };
+                    _formatDirty = false;
+                    // Сохраняем ОБА измерения: Alignment — горизонталь, LineAlignment — вертикаль.
+                    // Иначе MiddleCenter/BottomRight и т.п. схлопнутся в верхнюю строку.
+                    _ownedFormat = new StringFormat
+                    {
+                        Alignment = ToAlignment(_label.TextAlign),
+                        LineAlignment = ToLineAlignment(_label.TextAlign)
+                    };
                 }
                 return _ownedFormat.Wrap();
             }
@@ -123,8 +133,9 @@ namespace DisplayNodes.WinFormsAdapter.Components
             {
                 var gdi = value.ToGdi();
                 if (gdi == null) return;
-                _label.TextAlign = ToContentAlignment(gdi.Alignment);
-                _cachedAlign = default;
+                // Восстанавливаем полный ContentAlignment из пары (Alignment, LineAlignment).
+                _label.TextAlign = ToContentAlignment(gdi.Alignment, gdi.LineAlignment);
+                _formatDirty = true;
             }
         }
 
@@ -175,6 +186,13 @@ namespace DisplayNodes.WinFormsAdapter.Components
             _label.Dispose();
         }
 
+        // ContentAlignment (9 значений) <-> пара StringAlignment (горизонталь + вертикаль).
+        // StringFormat в GDI+ имеет два независимых поля: Alignment (горизонтальное) и
+        // LineAlignment (вертикальное). Терялось второе измерение — текст всегда прижимался
+        // к верху. Ниже — биективное отображение между всеми 9 значениями ContentAlignment
+        // и парами (Alignment, LineAlignment).
+
+        /// <summary>Горизонтальная составляющая <see cref="ContentAlignment"/>.</summary>
         private static StringAlignment ToAlignment(ContentAlignment align)
         {
             switch (align)
@@ -196,14 +214,58 @@ namespace DisplayNodes.WinFormsAdapter.Components
             }
         }
 
-        private static ContentAlignment ToContentAlignment(StringAlignment align)
+        /// <summary>Вертикальная составляющая <see cref="ContentAlignment"/>.</summary>
+        private static StringAlignment ToLineAlignment(ContentAlignment align)
         {
             switch (align)
             {
-                case StringAlignment.Near: return ContentAlignment.TopLeft;
-                case StringAlignment.Center: return ContentAlignment.TopCenter;
-                case StringAlignment.Far: return ContentAlignment.TopRight;
-                default: return ContentAlignment.TopLeft;
+                case ContentAlignment.TopLeft:
+                case ContentAlignment.TopCenter:
+                case ContentAlignment.TopRight:
+                    return StringAlignment.Near;
+                case ContentAlignment.MiddleLeft:
+                case ContentAlignment.MiddleCenter:
+                case ContentAlignment.MiddleRight:
+                    return StringAlignment.Center;
+                case ContentAlignment.BottomLeft:
+                case ContentAlignment.BottomCenter:
+                case ContentAlignment.BottomRight:
+                    return StringAlignment.Far;
+                default:
+                    return StringAlignment.Near;
+            }
+        }
+
+        /// <summary>
+        /// Собирает полный <see cref="ContentAlignment"/> из пары выравниваний
+        /// <see cref="StringFormat"/> (горизонталь + вертикаль) без потери информации.
+        /// </summary>
+        private static ContentAlignment ToContentAlignment(
+            StringAlignment horizontal, StringAlignment vertical)
+        {
+            switch (vertical)
+            {
+                case StringAlignment.Center when horizontal == StringAlignment.Near:
+                    return ContentAlignment.MiddleLeft;
+                case StringAlignment.Center when horizontal == StringAlignment.Center:
+                    return ContentAlignment.MiddleCenter;
+                case StringAlignment.Center when horizontal == StringAlignment.Far:
+                    return ContentAlignment.MiddleRight;
+
+                case StringAlignment.Far when horizontal == StringAlignment.Near:
+                    return ContentAlignment.BottomLeft;
+                case StringAlignment.Far when horizontal == StringAlignment.Center:
+                    return ContentAlignment.BottomCenter;
+                case StringAlignment.Far when horizontal == StringAlignment.Far:
+                    return ContentAlignment.BottomRight;
+
+                default: // StringAlignment.Near
+                    switch (horizontal)
+                    {
+                        case StringAlignment.Center: return ContentAlignment.TopCenter;
+                        case StringAlignment.Far: return ContentAlignment.TopRight;
+                        default: return ContentAlignment.TopLeft;
+                    }
             }
         }
     }
