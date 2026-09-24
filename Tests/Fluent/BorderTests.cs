@@ -195,6 +195,52 @@ public class BorderTests
         Assert.That(bg, Is.InstanceOf<BackgroundNode>());
     }
 
+    // ---------------------------------------------------------------
+    // Регрессия: «UI.Border без контента» (кнопка) должен быть видим и растянут на слот
+    // ---------------------------------------------------------------
+
+    [Test]
+    public void Border_WithoutContent_InOverlay_FillsSlotOnArrange()
+    {
+        // border(0x0) + label — ровно структура кнопки из Playground.
+        var overlay = UI.Border(new StubBrush(), cornerRadius: 5)
+            .Add(new FixedNode(100, 40));
+
+        overlay.Measure(Size.Infinity);
+        overlay.Arrange(new Rect(0, 0, 500, 300));
+
+        var clip = (ClipNode)overlay.Children[0];
+        var bg = (BackgroundNode)clip.Children[0];
+
+        using (Assert.EnterMultipleScope())
+        {
+            // Клип и фон занимают весь слот оверлея, а не схлопываются в точку (регрессия).
+            Assert.That(clip.Mask.Size, Is.EqualTo(new Size(500, 300)));
+            Assert.That(clip.Mask.Location, Is.EqualTo(new Point(0, 0)));
+            Assert.That(bg.Bounds.Size, Is.EqualTo(new Size(500, 300)));
+        }
+    }
+
+    [Test]
+    public void Clip_Padding_AffectsMeasureAndInnerSlot()
+    {
+        var clip = UI.ClipRoundedRect(5)
+            .Padding(12)
+            .Add(new FixedNode(100, 50));
+
+        var size = clip.Measure(Size.Infinity);
+
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(size.Width, Is.EqualTo(124));   // 100 + 12*2
+            Assert.That(size.Height, Is.EqualTo(74));   // 50 + 12*2
+        }
+
+        clip.Arrange(new Rect(0, 0, 200, 100));
+        // Маска — по всему слоту (фон под padding тоже скругляется), дети — внутри отступов.
+        Assert.That(clip.Mask.Size, Is.EqualTo(new Size(200, 100)));
+    }
+
     // ===============================================================
     // Стабы
     // ===============================================================
@@ -229,6 +275,7 @@ public class BorderTests
         public IBrush BackgroundBrush { get; set; }
         public ITextFormat Format { get; set; }
         public bool UseMnemonic { get; set; }
+        public Thickness Padding { get; set; }
 
         public IRenderComponent Parent { get; set; }
         public Point Location { get; set; }

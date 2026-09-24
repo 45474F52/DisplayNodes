@@ -16,6 +16,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+using DisplayNodes.Core;
 using DisplayNodes.WinFormsAdapter;
 using Point = DisplayNodes.Core.Point;
 using Size = DisplayNodes.Core.Size;
@@ -100,21 +101,60 @@ namespace DisplayNodes.Tests.Adapters.WinFormsAdapter
         }
 
         [Test]
-        public void ClipNode_Measure_WithOnlyBackground_IsAtLeastOnePixel()
+        public void ClipNode_Measure_WithOnlyBackground_IsZero()
         {
             // UI.Border(...) кладёт BackgroundNode внутрь ClipNode; фон даёт DesiredSize 0,
-            // но клип не должен возвращать нулевой размер — иначе GDI+ падает на построении Region.
+            // и клип честно возвращает 0x0 (регрессия на «border высотой 1 пиксель»).
+            // Валидность формы для GDI+ обеспечивает MaskBase: регион строится только при
+            // ненулевом размере, а до первого реального Arrange контрол скрыт.
             var clip = new DisplayNodes.Widgets.ClipNode(_factory.CreateRoundedRectMask(8f));
-            clip.Children.Add(new DisplayNodes.Widgets.BackgroundNode(
+            var bg = new DisplayNodes.Widgets.BackgroundNode(
                 new DisplayNodes.Gdi.GdiBrush(new System.Drawing.SolidBrush(System.Drawing.Color.Gray)),
-                (DisplayNodes.Core.Rendering.ILabelComponent)new WinFormsAdapter.Components.Label()));
+                (DisplayNodes.Core.Rendering.ILabelComponent)new WinFormsAdapter.Components.Label());
+            clip.Children.Add(bg);
 
             var size = clip.Measure(new Size(int.MaxValue, int.MaxValue));
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(size.Width, Is.GreaterThanOrEqualTo(1));
-                Assert.That(size.Height, Is.GreaterThanOrEqualTo(1));
+                Assert.That(size.Width, Is.EqualTo(0));
+                Assert.That(size.Height, Is.EqualTo(0));
+            }
+
+            // При размещении в реальный слот маска и фон растягиваются на весь слот,
+            // несмотря на DesiredSize 0x0 (иначе Border без контента был бы невидим).
+            clip.Arrange(new DisplayNodes.Core.Rect(0, 0, 120, 60));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(clip.Mask.Size, Is.EqualTo(new Size(120, 60)));
+                Assert.That(bg.Bounds.Width, Is.EqualTo(120));
+                Assert.That(bg.Bounds.Height, Is.EqualTo(60));
+            }
+            (clip as IDisposable)?.Dispose();
+        }
+
+        [Test]
+        public void ClipNode_Padding_AffectsMeasureAndChildrenSlot()
+        {
+            var clip = new DisplayNodes.Widgets.ClipNode(_factory.CreateRectMask());
+            clip.Padding = new DisplayNodes.Core.Thickness(10);
+            var fixedChild = new FixedNode(50, 30);
+            clip.Children.Add(fixedChild);
+
+            var size = clip.Measure(new Size(int.MaxValue, int.MaxValue));
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(size.Width, Is.EqualTo(70));   // 50 + 10*2
+                Assert.That(size.Height, Is.EqualTo(50));  // 30 + 10*2
+            }
+
+            clip.Arrange(new DisplayNodes.Core.Rect(0, 0, 200, 100));
+            // Маска занимает весь слот, дети — область без padding.
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(clip.Mask.Location, Is.EqualTo(new Point(0, 0)));
+                Assert.That(clip.Mask.Size, Is.EqualTo(new Size(200, 100)));
+                Assert.That(fixedChild.Bounds.Point, Is.EqualTo(new Point(10, 10)));
             }
             (clip as IDisposable)?.Dispose();
         }

@@ -104,6 +104,15 @@ namespace DisplayNodes.LibDisplayDrawingAdapter.Components
 				set => throw new NotSupportedException("UseMnemonic is not supported by LibDisplayDrawingAdapter.");
 		}
 
+		/// <summary>
+		/// Не поддерживается: native-контроль Label2D форматирует текстовую область сам.
+		/// </summary>
+		public Thickness Padding
+		{
+				get => throw new NotSupportedException("Padding is not supported by LibDisplayDrawingAdapter.");
+				set => throw new NotSupportedException("Padding is not supported by LibDisplayDrawingAdapter.");
+		}
+
 		/// <inheritdoc/>
 		public TextDrawMethod DrawMethod
 		{

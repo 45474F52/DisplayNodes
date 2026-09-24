@@ -131,14 +131,25 @@ namespace DisplayNodes.Widgets
 		/// <inheritdoc/>
 		protected override Size MeasureOverride(Size available)
 		{
+			// Отступы прибавляются к размеру контента, а текст измеряется во внутренней области
+			// (Bounds в ApplyBounds — это уже область без padding'а).
+			Size inner = available.Deflate(Padding);
+
+			Size content;
 			if (_fixedSize.HasValue)
-				return _fixedSize.Value;
-			if (string.IsNullOrEmpty(Component.Text) || Component.Font == null)
-				return Size.Empty;
-			int maxWidth = available.Width == int.MaxValue
-				? 0
-				: Math.Max(0, available.Width);
-			return _measurer.MeasureArea(Component.Text, Component.Font, maxWidth);
+				content = _fixedSize.Value;
+			else if (string.IsNullOrEmpty(Component.Text) || Component.Font == null)
+				content = Size.Empty;
+			else
+			{
+				int maxWidth = inner.Width == int.MaxValue
+					? 0
+					: Math.Max(0, inner.Width);
+				content = _measurer.MeasureArea(Component.Text, Component.Font, maxWidth);
+			}
+
+			Component.Padding = Padding;
+			return new Size(content.Width + Padding.Horizontal, content.Height + Padding.Vertical);
 		}
 
 		/// <inheritdoc/>
@@ -146,6 +157,7 @@ namespace DisplayNodes.Widgets
 		{
 			Component.Location = Bounds.Point;
 			Component.Size = Bounds.Size;
+			Component.Padding = Padding;
 		}
 	}
 }

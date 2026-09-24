@@ -50,6 +50,13 @@ namespace DisplayNodes.WinFormsAdapter.Component.Masks
             set => Size = new System.Drawing.Size(value.Width, value.Height);
         }
 
+        public MaskBase()
+        {
+            // До первого реального Arrange (нулевой размер) контрол скрыт: так он не
+            // участвует в отрисовке и не пытается построить недопустимый для GDI+ регион.
+            Visible = false;
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
@@ -57,7 +64,8 @@ namespace DisplayNodes.WinFormsAdapter.Component.Masks
         }
 
         // Пока маска не получила ненулевой размер (первый кадр лэйаута ещё не прошёл),
-        // вместо Region строим пустую — иначе формы с нулевыми габаритами недопустимы для GDI+.
+        // регион не строим вовсе — формы с нулевыми габаритами недопустимы для GDI+
+        // (ArgumentException «Недопустимый параметр» в Region/GraphicsPath.AddArc).
         private bool HasValidSize => Width > 0 && Height > 0;
 
         protected virtual System.Drawing.Region CreateRegion()
@@ -68,7 +76,12 @@ namespace DisplayNodes.WinFormsAdapter.Component.Masks
         private void UpdateRegion()
         {
             Region?.Dispose();
-            Region = HasValidSize ? CreateRegion() : new System.Drawing.Region(System.Drawing.Rectangle.Empty);
+            Region = null;
+            if (!HasValidSize)
+                return;
+            Region = CreateRegion();
+            Visible = true;
+            Invalidate();
         }
     }
 }

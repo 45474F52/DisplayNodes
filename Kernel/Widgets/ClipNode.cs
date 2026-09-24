@@ -44,28 +44,40 @@ namespace DisplayNodes.Widgets
         /// <inheritdoc/>
         protected override Size MeasureOverride(Size available)
         {
+            // Отступы уменьшают доступную область детей и прибавляются к итоговому размеру
+            // (как у остальных контейнеров).
+            Size inner = available.Deflate(Padding);
             int maxWidth = 0, maxHeight = 0;
             foreach (LayoutNode child in Children)
             {
-                Size size = child.Measure(available);
+                Size size = child.Measure(inner);
                 maxWidth = Math.Max(maxWidth, size.Width);
                 maxHeight = Math.Max(maxHeight, size.Height);
             }
 
-            // Фон внутри клипа измеряется в нулевой доступный слот (BackgroundNode.DesiredSize = 0),
-            // поэтому сам клип может получить нулевую высоту. Нулевая форма недопустима для GDI+
-            // (Region/AddArc падают с ArgumentException "Недопустимый параметр"), так что
-            // возвращаем минимально допустимый размер — он перекрывается реальным при Arrange.
-            return new Size(Math.Max(1, maxWidth), Math.Max(1, maxHeight));
+            // ВАЖНО: не подменять нулевой результат единицей. Клип, содержащий только фон
+            // (UI.Border без контента), по контракту имеет DesiredSize 0x0; «защита от нуля»
+            // на уровне измерений ломала лэйаут (колонка растягивалась на весь слот) и не
+            // решала проблему GDI+ — валидность формы обеспечивает MaskBase: регион строится
+            // только при ненулевом размере контрола, а до первого реального Arrange
+            // контрол скрыт (см. WinFormsAdapter/Components/Masks/MaskBase.cs).
+            return new Size(maxWidth + Padding.Horizontal, maxHeight + Padding.Vertical);
         }
 
         /// <inheritdoc/>
         protected override void ArrangeOverride(Rect finalRect)
         {
-            Mask.Location = finalRect.Point;
-            Mask.Size = finalRect.Size;
+            // Маска и дети получают СЛОТ целиком, а не Bounds после выравнивания:
+            // иначе клип с DesiredSize 0x0 (UI.Border без контента), выровненный по Start,
+            // схлопывался бы в точку — «невидимый» фон. Фон внутри обязан растянуться на весь слот.
+            Rect slot = finalRect.Deflate(Margin);
+            Bounds = slot;
+
+            Mask.Location = slot.Point;
+            Mask.Size = slot.Size;
+            Rect inner = slot.Deflate(Padding);
             foreach (LayoutNode child in Children)
-                child.Arrange(finalRect);
+                child.Arrange(inner);
         }
 
         /// <summary>Освобождает ресурсы маски.</summary>

@@ -62,6 +62,19 @@ namespace DisplayNodes.Widgets
         /// <inheritdoc/>
         protected override Size MeasureOverride(Size available) => Size.Empty;
 
+        /// <summary>
+        /// Фон всегда занимает весь предоставленный слот (с учётом Margin), независимо от
+        /// DesiredSize = 0x0. Базовое выравнивание схлопнуло бы нулевой desired в точку,
+        /// и «Border без контента» (UI.Border(...).Add(UI.Label(...)), где фон лежит в
+        /// отдельном клипе под контентом) становился невидимым.
+        /// </summary>
+        public sealed override void Arrange(Rect finalRect)
+        {
+            Rect inner = finalRect.Deflate(Margin);
+            Bounds = inner;
+            ArrangeOverride(inner);
+        }
+
 		/// <inheritdoc/>
 		protected override void ApplyBounds()
 		{
