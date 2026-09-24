@@ -48,6 +48,9 @@ namespace DisplayNodes.Fluent
 		/// <summary>Фабрика изображений. Должна быть установлена перед использованием.</summary>
 		public static IImageFactory ImageFactory { get; set; }
 
+		/// <summary>Фабрика форматов текста. Должна быть установлена перед использованием.</summary>
+		public static ITextFormatFactory TextFormatFactory { get; set; }
+
 		private static IWidgetFactory RequireFactory()
 			=> Factory ?? throw new InvalidOperationException("UI.Factory is not initialized. Call Adapter.Initialize() first.");
 
@@ -62,6 +65,9 @@ namespace DisplayNodes.Fluent
 
 		private static IImageFactory RequireImageFactory()
 			=> ImageFactory ?? throw new InvalidOperationException("UI.ImageFactory is not initialized. Call Adapter.Initialize() first.");
+
+		private static ITextFormatFactory RequireTextFormatFactory()
+			=> TextFormatFactory ?? throw new InvalidOperationException("UI.TextFormatFactory is not initialized. Call Adapter.Initialize() first.");
 
 		/// <summary>Создаёт шрифт</summary>
 		public static IFont Font(string family, float size, bool bold = false, bool italic = false)
@@ -78,6 +84,12 @@ namespace DisplayNodes.Fluent
 
 		/// <summary>Создаёт кисть по переданному цвету</summary>
 		public static IBrush SolidBrush(Color color) => RequireBrushFactory().CreateSolidBrush(color);
+
+		/// <summary>Создаёт формат текста с горизонтальным и вертикальным выравниванием.</summary>
+		/// <param name="horizontal">Выравнивание по горизонтали.</param>
+		/// <param name="vertical">Выравнивание по вертикали (по умолчанию как по горизонтали).</param>
+		public static ITextFormat TextFormat(Alignment horizontal, Alignment? vertical = null)
+				=> RequireTextFormatFactory().Create(horizontal, vertical ?? horizontal);
 
 		/// <summary>Создаёт стек-контейнер (строка или столбец).</summary>
 		public static StackLayoutNode Stack(bool vertical = true, int spacing = 0)
