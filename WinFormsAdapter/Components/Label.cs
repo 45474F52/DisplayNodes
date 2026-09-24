@@ -84,8 +84,8 @@ namespace DisplayNodes.WinFormsAdapter.Components
             // поэтому эмулируем его «верхний» режим: Near -> Top, Center -> TopCenter, Far -> TopRight.
             ContentAlignment align = _useMnemonic ? EmulateSystemAlign(_align) : _align;
 
-            Size textSize = TextRenderer.MeasureText(
-                e.Graphics, _label.Text, _label.Font, Size.Empty, TextFormatFlags.NoPadding);
+            System.Drawing.Size textSize = TextRenderer.MeasureText(
+                e.Graphics, _label.Text, _label.Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding);
 
             int x;
             switch (ToAlignment(align))
