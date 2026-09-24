@@ -39,17 +39,87 @@ namespace DisplayNodes.WinFormsAdapter.Components
         private SolidBrush _cachedBackground;
         private Color _cachedForeColor;
         private Color _cachedBackColor;
-        private ContentAlignment _cachedAlign;
-        // Флаг: формат был установлен извне — нужно пересоздать кэш при следующем чтении,
-        // даже если ContentAlignment совпадает с закешированным (например Near+Far -> MiddleRight).
-        private bool _formatDirty;
+
+        // Полное двумерное выравнивание, заданное через Format.
+        // WinForms Label.TextAlign хранит обе оси (9 значений ContentAlignment), но на
+        // FlatStyle.System (нативный CONTROLTYPE_STATIC) ОС-рендерер поддерживает только
+        // верхний ряд (TopLeft/TopCenter/TopRight): текст с MiddleCenter рисуется по центру
+        // горизонтали, но прижимается к верху. Поэтому вертикальная составляющая учитывается
+        // здесь, а фактическое позиционирование выполняет OwnerDraw-рендер (OnPaint),
+        // использующий GDI+ TextRenderer.DrawText со StringFormat.Alignment + LineAlignment.
+        private ContentAlignment _align = ContentAlignment.TopLeft;
+        // true => Label.UseMnemonic (эмуляция FlatStyle.System: только верхний ряд),
+        // false => полный двумерный рендер по _align.
+        private bool _useMnemonic = true;
 
         public Label() : base(new System.Windows.Forms.Label())
         {
             _label = (System.Windows.Forms.Label)Inner;
 
             _label.BackColor = Color.Transparent;
-            _label.FlatStyle = FlatStyle.System;
+            // Только UserPaint даёт нам полный контроль над позиционированием текста
+            // (включая вертикальный центринг); нативная отрисовка системного Label его не поддерживает.
+            _label.FlatStyle = FlatStyle.Standard;
+            _label.AutoSize = false;
+            _label.Paint += OnPaint;
+        }
+
+        // Собственная отрисовка текста: фон заливается в Rectangle (как делал системный рендерер),
+        // текст рисуется через TextRenderer (ClearType/GDI, тот же рендер, что и у системного Label)
+        // с точным двумерным выравниванием.
+        private void OnPaint(object sender, PaintEventArgs e)
+        {
+            var bounds = _label.ClientRectangle;
+
+            using (var bg = new SolidBrush(_label.BackColor))
+                e.Graphics.FillRectangle(bg, bounds);
+
+            if (_label.Text.Length == 0)
+                return;
+
+            // FlatStyle.System физически не может отцентрировать текст по вертикали,
+            // поэтому эмулируем его «верхний» режим: Near -> Top, Center -> TopCenter, Far -> TopRight.
+            ContentAlignment align = _useMnemonic ? EmulateSystemAlign(_align) : _align;
+
+            TextRenderer.DrawText(
+                e.Graphics,
+                _label.Text,
+                _label.Font,
+                bounds,
+                _label.ForeColor,
+                Color.Empty,
+                ToTextFormatFlags(align),
+                _useMnemonic);
+        }
+
+        private static ContentAlignment EmulateSystemAlign(ContentAlignment align)
+        {
+            switch (ToAlignment(align))
+            {
+                case StringAlignment.Center: return ContentAlignment.TopCenter;
+                case StringAlignment.Far: return ContentAlignment.TopRight;
+                default: return ContentAlignment.TopLeft;
+            }
+        }
+
+        private static TextFormatFlags ToTextFormatFlags(ContentAlignment align)
+        {
+            // HorizontalCenter/VerticalCenter соответствуют StringAlignment.Center / LineAlignment.Center.
+            TextFormatFlags flags = TextFormatFlags.Default;
+
+            switch (ToAlignment(align))
+            {
+                case StringAlignment.Center: flags |= TextFormatFlags.HorizontalCenter; break;
+                case StringAlignment.Far: flags |= TextFormatFlags.Right; break;
+            }
+
+            switch (ToLineAlignment(align))
+            {
+                case StringAlignment.Center: flags |= TextFormatFlags.VerticalCenter; break;
+                case StringAlignment.Far: flags |= TextFormatFlags.Bottom; break;
+            }
+
+            return flags;
         }
 
         public string Text
@@ -114,17 +184,18 @@ namespace DisplayNodes.WinFormsAdapter.Components
         {
             get
             {
-                if (_ownedFormat == null || _formatDirty || _cachedAlign != _label.TextAlign)
+                // Сохраняем ОБА измерения: Alignment — горизонталь, LineAlignment — вертикаль.
+                // Источник истины — поле _align (двумерное), а не Label.TextAlign,
+                // который при OwnerDraw-рендеринге не используется для позиционирования.
+                if (_ownedFormat == null
+                    || _ownedFormat.Alignment != ToAlignment(_align)
+                    || _ownedFormat.LineAlignment != ToLineAlignment(_align))
                 {
                     _ownedFormat?.Dispose();
-                    _cachedAlign = _label.TextAlign;
-                    _formatDirty = false;
-                    // Сохраняем ОБА измерения: Alignment — горизонталь, LineAlignment — вертикаль.
-                    // Иначе MiddleCenter/BottomRight и т.п. схлопнутся в верхнюю строку.
                     _ownedFormat = new StringFormat
                     {
-                        Alignment = ToAlignment(_label.TextAlign),
-                        LineAlignment = ToLineAlignment(_label.TextAlign)
+                        Alignment = ToAlignment(_align),
+                        LineAlignment = ToLineAlignment(_align)
                     };
                 }
                 return _ownedFormat.Wrap();
@@ -134,8 +205,30 @@ namespace DisplayNodes.WinFormsAdapter.Components
                 var gdi = value.ToGdi();
                 if (gdi == null) return;
                 // Восстанавливаем полный ContentAlignment из пары (Alignment, LineAlignment).
-                _label.TextAlign = ToContentAlignment(gdi.Alignment, gdi.LineAlignment);
-                _formatDirty = true;
+                _align = ToContentAlignment(gdi.Alignment, gdi.LineAlignment);
+                // Формат с ненулевым вертикальным смещением (Center/Far в LineAlignment)
+                // невозможно выразить системным (нативным) рендером — переключаемся на
+                // полноценный OwnerDraw-рендер. Near (верх) остаётся совместим с FlatStyle.System.
+                if (gdi.LineAlignment != StringAlignment.Near)
+                    _useMnemonic = false;
+                _label.Invalidate();
+            }
+        }
+
+        /// <summary>
+        /// Управление mnemonics ('&amp;') и режимом рендера:
+        /// true — эмуляция прежнего FlatStyle.System (текст всегда в верхнем ряду, '&amp;' как мнемоника),
+        /// false — точное двумерное выравнивание текста по формату (устанавливается автоматически
+        /// при задании вертикального выравнивания, отличного от «верх»).
+        /// </summary>
+        public bool UseMnemonic
+        {
+            get => _useMnemonic;
+            set
+            {
+                _useMnemonic = value;
+                _label.UseMnemonic = value;
+                _label.Invalidate();
             }
         }
 

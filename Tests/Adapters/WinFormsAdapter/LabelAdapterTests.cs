@@ -60,6 +60,51 @@ namespace DisplayNodes.Tests.Adapters.WinFormsAdapter
         }
 
         [Test]
+        public void Format_VerticalCenter_PreservedInGetAndUseMnemonicSwitchedOff()
+        {
+            var label = _factory.CreateLabel();
+
+            using var original = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center
+            };
+            label.Format = new GdiTextFormat(original);
+
+            // Вертикальная составляющая не должна теряться при round-trip через Format.
+            var readBack = label.Format.ToGdi();
+            Assert.That(readBack.Alignment, Is.EqualTo(StringAlignment.Center));
+            Assert.That(readBack.LineAlignment, Is.EqualTo(StringAlignment.Center),
+                "LineAlignment (vertical) must be preserved");
+
+            // Двумерное выравнивание возможно только в OwnerDraw-режиме (UseMnemonic=false):
+            // нативный рендер системного Label поддерживает только верхний ряд.
+            Assert.That(label.UseMnemonic, Is.False);
+
+            (label as IDisposable)?.Dispose();
+        }
+
+        [Test]
+        public void Format_TopVertical_KeepsSystemRenderMode()
+        {
+            var label = _factory.CreateLabel();
+
+            using var original = new StringFormat
+            {
+                Alignment = StringAlignment.Far,
+                LineAlignment = StringAlignment.Near
+            };
+            label.Format = new GdiTextFormat(original);
+
+            var readBack = label.Format.ToGdi();
+            Assert.That(readBack.Alignment, Is.EqualTo(StringAlignment.Far));
+            Assert.That(readBack.LineAlignment, Is.EqualTo(StringAlignment.Near));
+            Assert.That(label.UseMnemonic, Is.True);
+
+            (label as IDisposable)?.Dispose();
+        }
+
+        [Test]
         public void Format_ClonesOnSet_OriginalNotDisposedByAdapter()
         {
             var label = _factory.CreateLabel();

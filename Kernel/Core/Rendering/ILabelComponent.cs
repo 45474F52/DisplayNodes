@@ -45,5 +45,14 @@ namespace DisplayNodes.Core.Rendering
 		/// Форматирование текста (выравнивание, направление и т.д.).
 		/// </summary>
 		ITextFormat Format { get; set; }
+
+		/// <summary>
+		/// Режим mnemonics ('&amp;' как префикс мнемоники). В адаптерах также может
+		/// выбирать способ позиционирования текста (например, в WinForms true
+		/// эмулирует системный рендер с верхним рядом, false включает точное
+		/// двумерное выравнивание). Поддержка опциональна: компоненты без такого
+		/// режима могут бросать <see cref="NotSupportedException"/>.
+		/// </summary>
+		bool UseMnemonic { get; set; }
 	}
 }
