@@ -96,6 +96,15 @@ namespace DisplayNodes.LibDisplayDrawingAdapter.Components
 		}
 
 		/// <inheritdoc/>
+		/// <remarks>Режим mnemonics компонентом <c>Label2D</c> не поддерживается.</remarks>
+		/// <exception cref="NotSupportedException">Всегда.</exception>
+		public bool UseMnemonic
+		{
+				get => throw new NotSupportedException("UseMnemonic is not supported by LibDisplayDrawingAdapter.");
+				set => throw new NotSupportedException("UseMnemonic is not supported by LibDisplayDrawingAdapter.");
+		}
+
+		/// <inheritdoc/>
 		public TextDrawMethod DrawMethod
 		{
 			get => (TextDrawMethod)(int)_label.DrawMethod;

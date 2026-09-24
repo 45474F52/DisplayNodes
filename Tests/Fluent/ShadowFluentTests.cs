@@ -84,6 +84,7 @@ public class ShadowFluentTests
         public IBrush ForegroundBrush { get; set; }
         public IBrush BackgroundBrush { get; set; }
         public ITextFormat Format { get; set; }
+        public bool UseMnemonic { get; set; }
 
         public IRenderComponent Parent { get; set; }
         public Point Location { get; set; }
