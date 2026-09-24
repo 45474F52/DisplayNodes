@@ -37,6 +37,7 @@ namespace DisplayNodes.WinFormsAdapter
             UI.BrushFactory = new GdiBrushFactory();
             UI.FontFactory = new GdiFontFactory();
             UI.ImageFactory = new GdiImageFactory();
+            UI.TextFormatFactory = new GdiTextFormatFactory();
         }
     }
 }

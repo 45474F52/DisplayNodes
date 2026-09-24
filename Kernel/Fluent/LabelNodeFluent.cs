@@ -51,6 +51,14 @@ namespace DisplayNodes.Fluent
 			return node;
 		}
 
+		/// <summary>Устанавливает выравнивание текста по горизонтали и вертикали.</summary>
+		/// <remarks>
+		/// Пример: <c>UI.Label("Hello", font, brush).TextAlign(Alignment.Center)</c> —
+		/// точно по центру виджета по обеим осям.
+		/// </remarks>
+		public static LabelNode TextAlign(this LabelNode node, Alignment horizontal, Alignment? vertical = null)
+				=> node.Format(UI.TextFormat(horizontal, vertical));
+
 		/// <summary>Устанавливает абстрактный формат текста.</summary>
 		public static LabelNode Format(this LabelNode node, ITextFormat format)
 		{
