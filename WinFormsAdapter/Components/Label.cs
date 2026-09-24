@@ -45,10 +45,10 @@ namespace DisplayNodes.WinFormsAdapter.Components
         // FlatStyle.System (нативный CONTROLTYPE_STATIC) ОС-рендерер поддерживает только
         // верхний ряд (TopLeft/TopCenter/TopRight): текст с MiddleCenter рисуется по центру
         // горизонтали, но прижимается к верху. Поэтому вертикальная составляющая учитывается
-        // здесь, а фактическое позиционирование выполняет OwnerDraw-рендер (OnPaint),
-        // использующий GDI+ TextRenderer.DrawText со StringFormat.Alignment + LineAlignment.
+        // здесь, а фактическое позиционирование выполняет owner-draw рендер (OnPaint),
+        // использующий TextRenderer.DrawText (перегрузка с точкой привязки Point).
         private ContentAlignment _align = ContentAlignment.TopLeft;
-        // true => Label.UseMnemonic (эмуляция FlatStyle.System: только верхний ряд),
+        // true => эмуляция прежнего FlatStyle.System (текст в верхнем ряду),
         // false => полный двумерный рендер по _align.
         private bool _useMnemonic = true;
 
@@ -60,13 +60,16 @@ namespace DisplayNodes.WinFormsAdapter.Components
             // Только UserPaint даёт нам полный контроль над позиционированием текста
             // (включая вертикальный центринг); нативная отрисовка системного Label его не поддерживает.
             _label.FlatStyle = FlatStyle.Standard;
+            _label.UseMnemonic = false;
             _label.AutoSize = false;
             _label.Paint += OnPaint;
         }
 
         // Собственная отрисовка текста: фон заливается в Rectangle (как делал системный рендерер),
-        // текст рисуется через TextRenderer (ClearType/GDI, тот же рендер, что и у системного Label)
-        // с точным двумерным выравниванием.
+        // текст рисуется через TextRenderer (GDI, тот же рендер, что и у системного Label).
+        // ВАЖНО: используется перегрузка с Point — точка привязки (top-left corner of text),
+        // а НЕ Rectangle-перегрузка (она обрезает текст по прямоугольнику и иначе раскладывает
+        // флаги выравнивания). Смещение вычисляется вручную по измеренному размеру строки.
         private void OnPaint(object sender, PaintEventArgs e)
         {
             var bounds = _label.ClientRectangle;
@@ -81,15 +84,33 @@ namespace DisplayNodes.WinFormsAdapter.Components
             // поэтому эмулируем его «верхний» режим: Near -> Top, Center -> TopCenter, Far -> TopRight.
             ContentAlignment align = _useMnemonic ? EmulateSystemAlign(_align) : _align;
 
+            Size textSize = TextRenderer.MeasureText(
+                e.Graphics, _label.Text, _label.Font, Size.Empty, TextFormatFlags.NoPadding);
+
+            int x;
+            switch (ToAlignment(align))
+            {
+                case StringAlignment.Center: x = bounds.Left + (bounds.Width - textSize.Width) / 2; break;
+                case StringAlignment.Far: x = bounds.Right - textSize.Width; break;
+                default: x = bounds.Left; break;
+            }
+
+            int y;
+            switch (ToLineAlignment(align))
+            {
+                case StringAlignment.Center: y = bounds.Top + (bounds.Height - textSize.Height) / 2; break;
+                case StringAlignment.Far: y = bounds.Bottom - textSize.Height; break;
+                default: y = bounds.Top; break;
+            }
+
             TextRenderer.DrawText(
                 e.Graphics,
                 _label.Text,
                 _label.Font,
-                bounds,
+                new System.Drawing.Point(x, y),
                 _label.ForeColor,
                 Color.Empty,
-                ToTextFormatFlags(align),
-                _useMnemonic);
+                ToTextFormatFlags(align));
         }
 
         private static ContentAlignment EmulateSystemAlign(ContentAlignment align)
@@ -104,22 +125,11 @@ namespace DisplayNodes.WinFormsAdapter.Components
 
         private static TextFormatFlags ToTextFormatFlags(ContentAlignment align)
         {
-            // HorizontalCenter/VerticalCenter соответствуют StringAlignment.Center / LineAlignment.Center.
-            TextFormatFlags flags = TextFormatFlags.Default;
-
-            switch (ToAlignment(align))
-            {
-                case StringAlignment.Center: flags |= TextFormatFlags.HorizontalCenter; break;
-                case StringAlignment.Far: flags |= TextFormatFlags.Right; break;
-            }
-
-            switch (ToLineAlignment(align))
-            {
-                case StringAlignment.Center: flags |= TextFormatFlags.VerticalCenter; break;
-                case StringAlignment.Far: flags |= TextFormatFlags.Bottom; break;
-            }
-
-            return flags;
+            // Точку привязки задаём сами (Point-перегрузка DrawText), поэтому выравнивающие
+            // флаги не нужны — иначе они применились бы ещё раз внутри TextRenderer
+            // (к смещённой точке) и текст уехал бы за границы виджета.
+            // NoPadding: смещение считано MeasureText с теми же флагами, без запасов GDI.
+            return TextFormatFlags.NoPadding;
         }
 
         public string Text
