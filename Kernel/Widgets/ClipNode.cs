@@ -51,7 +51,12 @@ namespace DisplayNodes.Widgets
                 maxWidth = Math.Max(maxWidth, size.Width);
                 maxHeight = Math.Max(maxHeight, size.Height);
             }
-            return new Size(maxWidth, maxHeight);
+
+            // Фон внутри клипа измеряется в нулевой доступный слот (BackgroundNode.DesiredSize = 0),
+            // поэтому сам клип может получить нулевую высоту. Нулевая форма недопустима для GDI+
+            // (Region/AddArc падают с ArgumentException "Недопустимый параметр"), так что
+            // возвращаем минимально допустимый размер — он перекрывается реальным при Arrange.
+            return new Size(Math.Max(1, maxWidth), Math.Max(1, maxHeight));
         }
 
         /// <inheritdoc/>

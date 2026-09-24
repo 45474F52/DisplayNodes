@@ -87,6 +87,39 @@ namespace DisplayNodes.Tests.Adapters.WinFormsAdapter
         }
 
         [Test]
+        public void RoundedRectMask_ZeroHeight_DoesNotThrow()
+        {
+            // Регрессия на ArgumentException ("Недопустимый параметр") в GraphicsPath.AddArc:
+            // маска может получить нулевую высоту до/во время первого прохода лэйаута.
+            var mask = _factory.CreateRoundedRectMask(8f);
+            Assert.DoesNotThrow(() => mask.Size = new Size(69, 0));
+            Assert.DoesNotThrow(() => mask.Size = new Size(0, 0));
+            Assert.DoesNotThrow(() => mask.Size = new Size(69, 16)); // вырожденный случай: r >= H/2
+            Assert.DoesNotThrow(() => mask.Size = new Size(69, 40)); // нормальный скруглённый прямоугольник
+            (mask as IDisposable)?.Dispose();
+        }
+
+        [Test]
+        public void ClipNode_Measure_WithOnlyBackground_IsAtLeastOnePixel()
+        {
+            // UI.Border(...) кладёт BackgroundNode внутрь ClipNode; фон даёт DesiredSize 0,
+            // но клип не должен возвращать нулевой размер — иначе GDI+ падает на построении Region.
+            var clip = new DisplayNodes.Widgets.ClipNode(_factory.CreateRoundedRectMask(8f));
+            clip.Children.Add(new DisplayNodes.Widgets.BackgroundNode(
+                new DisplayNodes.Gdi.GdiBrush(new System.Drawing.SolidBrush(System.Drawing.Color.Gray)),
+                (DisplayNodes.Core.Rendering.ILabelComponent)new WinFormsAdapter.Components.Label()));
+
+            var size = clip.Measure(new Size(int.MaxValue, int.MaxValue));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(size.Width, Is.GreaterThanOrEqualTo(1));
+                Assert.That(size.Height, Is.GreaterThanOrEqualTo(1));
+            }
+            (clip as IDisposable)?.Dispose();
+        }
+
+        [Test]
         public void PathMask_WithBuilder_Works()
         {
             var mask = _factory.CreatePathMask(rect =>

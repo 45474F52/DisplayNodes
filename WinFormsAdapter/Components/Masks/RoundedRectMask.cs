@@ -34,12 +34,23 @@ namespace DisplayNodes.WinFormsAdapter.Components.Masks
 
         protected override Region CreateRegion()
         {
+            // Радиус не должен превращаться в ноль: AddArc с нулевым размером дуги — ArgumentException.
+            float r = Math.Max(0.5f, Math.Min(CornerRadius, Math.Min(Width, Height) / 2f));
+            if (r >= Math.Min(Width, Height) / 2f)
+            {
+                // Вырожденный случай (высота <= 2*радиуса): рисуем эллипс целиком, без дуг с d >= стороны.
+                using (var path = new GraphicsPath())
+                {
+                    path.AddEllipse(0, 0, Width, Height);
+                    return new Region(path);
+                }
+            }
+
+            float d = r * 2;
+            var rect = new RectangleF(0, 0, Width, Height);
+
             using (var path = new GraphicsPath())
             {
-                float r = Math.Min(CornerRadius, Math.Min(Width, Height) / 2);
-                float d = r * 2;
-                var rect = new RectangleF(0, 0, Width, Height);
-
                 path.AddArc(rect.X, rect.Y, d, d, 180, 90);
                 path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
                 path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);

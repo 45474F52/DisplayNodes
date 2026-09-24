@@ -51,6 +51,10 @@ namespace DisplayNodes.WinFormsAdapter.Components
         // true => эмуляция прежнего FlatStyle.System (текст в верхнем ряду),
         // false => полный двумерный рендер по _align.
         private bool _useMnemonic = true;
+        // Внутренние отступы текстовой области (см. ILabelComponent.Padding):
+        // фон заливается на весь ClientRectangle, текст позиционируется внутри
+        // прямоугольника, сдвинутого на padding.
+        private Thickness _padding;
 
         public Label() : base(new System.Windows.Forms.Label())
         {
@@ -84,23 +88,31 @@ namespace DisplayNodes.WinFormsAdapter.Components
             // поэтому эмулируем его «верхний» режим: Near -> Top, Center -> TopCenter, Far -> TopRight.
             ContentAlignment align = _useMnemonic ? EmulateSystemAlign(_align) : _align;
 
-            System.Drawing.Size textSize = TextRenderer.MeasureText(
-                e.Graphics, _label.Text, _label.Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding);
+            // Область текста = ClientRectangle минус Padding (фон при этом льётся на весь
+            // ClientRectangle — как Padding у Label в WPF).
+            var textArea = new Rectangle(
+                bounds.Left + _padding.Left,
+                bounds.Top + _padding.Top,
+                Math.Max(0, bounds.Width - _padding.Horizontal),
+                Math.Max(0, bounds.Height - _padding.Vertical));
+
+            Size textSize = TextRenderer.MeasureText(
+                e.Graphics, _label.Text, _label.Font, Size.Empty, TextFormatFlags.NoPadding);
 
             int x;
             switch (ToAlignment(align))
             {
-                case StringAlignment.Center: x = bounds.Left + (bounds.Width - textSize.Width) / 2; break;
-                case StringAlignment.Far: x = bounds.Right - textSize.Width; break;
-                default: x = bounds.Left; break;
+                case StringAlignment.Center: x = textArea.Left + (textArea.Width - textSize.Width) / 2; break;
+                case StringAlignment.Far: x = textArea.Right - textSize.Width; break;
+                default: x = textArea.Left; break;
             }
 
             int y;
             switch (ToLineAlignment(align))
             {
-                case StringAlignment.Center: y = bounds.Top + (bounds.Height - textSize.Height) / 2; break;
-                case StringAlignment.Far: y = bounds.Bottom - textSize.Height; break;
-                default: y = bounds.Top; break;
+                case StringAlignment.Center: y = textArea.Top + (textArea.Height - textSize.Height) / 2; break;
+                case StringAlignment.Far: y = textArea.Bottom - textSize.Height; break;
+                default: y = textArea.Top; break;
             }
 
             TextRenderer.DrawText(
@@ -238,6 +250,23 @@ namespace DisplayNodes.WinFormsAdapter.Components
             {
                 _useMnemonic = value;
                 _label.UseMnemonic = value;
+                _label.Invalidate();
+            }
+        }
+
+        /// <summary>
+        /// Внутренние отступы текстовой области. Фон заливается на весь ClientRectangle,
+        /// текст позиционируется внутри прямоугольника, сдвинутого на padding
+        /// (аналог Padding у Label в WPF).
+        /// </summary>
+        public Thickness Padding
+        {
+            get => _padding;
+            set
+            {
+                if (_padding == value)
+                    return;
+                _padding = value;
                 _label.Invalidate();
             }
         }
